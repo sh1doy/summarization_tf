@@ -8,10 +8,10 @@ class AttentionDecoder(tf.keras.Model):
         super(AttentionDecoder, self).__init__()
         self.dim_rep = dim_rep
         self.F = tf.keras.layers.Embedding(vocab_size, dim_F)
-        self.gru = tf.keras.layers.LSTM(dim_rep,
-                                        return_sequences=True,
-                                        return_state=True,
-                                        recurrent_initializer='glorot_uniform')
+        self.gru = tf.keras.layers.CuDNNLSTM(dim_rep,
+                                             return_sequences=True,
+                                             return_state=True,
+                                             recurrent_initializer='glorot_uniform')
         self.fc = tf.keras.layers.Dense(vocab_size)
 
         # used for attention
