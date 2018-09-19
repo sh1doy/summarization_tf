@@ -1,112 +1,120 @@
-from layers import *
-import chainer
-from chainer import functions as F
-from chainer import Chain
-from chainer import cuda
+import tensorflow as tf
+from utils import pad_tensor
+import numpy as np
 
 
-class BaseModel(Chain):
-    '''
-    Write and self.decoder and self.encode() method.
-    self.encode(): inputs -> hx, cx, ys
-    self.decoder: hx, cx, ys -> hx, cx, ys
-    '''
+class AttentionDecoder(tf.keras.Model):
+    def __init__(self, dim_F, dim_rep, vocab_size):
+        super(AttentionDecoder, self).__init__()
+        self.dim_rep = dim_rep
+        self.F = tf.keras.layers.Embedding(vocab_size, dim_F)
+        self.gru = tf.keras.layers.LSTM(dim_rep,
+                                        return_sequences=True,
+                                        return_state=True,
+                                        recurrent_initializer='glorot_uniform')
+        self.fc = tf.keras.layers.Dense(vocab_size)
 
-    def __init__(self, in_vocab, out_vocab):
-        pass
+        # used for attention
+        self.W1 = tf.keras.layers.Dense(self.dim_rep)
+        self.W2 = tf.keras.layers.Dense(self.dim_rep)
+        self.V = tf.keras.layers.Dense(1)
 
-    def encode(self, seq):
-        """
-        labels, relations, coefs: array
-        texts: list of list
-        """
+    @staticmethod
+    def loss_function(real, pred):
+        loss_ = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=real, logits=pred)
+        return tf.reduce_sum(loss_)
 
-        # Encode
-        seq = [s[::-1] for s in seq]
-        seq_embedded = sequence_embed(self.E, seq)
-        hx, cx, ys = self.encoder(None, None, seq_embedded)
-        return(hx, cx, ys)
+    def get_loss(self, enc_y, states, target):
+        '''
+        enc_y: batch_size([seq_len, dim])
+        states: ([batch, dim], [batch, dim])
+        target: [batch, max_len] (padded with -1.)
+        '''
+        mask = tf.not_equal(target, -1.)
+        h, c = states
+        enc_y, _ = pad_tensor(enc_y)
+        dec_hidden = h
+        dec_cell = c
+        dec_input = target[:, 0]
+        loss = 0
+        for t in range(1, target.shape[1]):
+            # passing enc_output to the decoder
+            predictions, dec_hidden, dec_cell, att = self.call(
+                dec_input, dec_hidden, dec_cell, enc_y)
+            real = tf.boolean_mask(target[:, t], mask[:, t])
+            pred = tf.boolean_mask(predictions, mask[:, t])
+            loss += self.loss_function(real, pred)
+            # using teacher forcing
+            dec_input = target[:, t]
 
-    def get_loss(self, seq, texts):
+        return loss / tf.reduce_sum(tf.cast(mask, tf.float32))
 
-        hx, cx, ys = self.encode(seq)
+    def translate(self, y_enc, states, max_length, start_token, end_token):
+        '''
+        enc_y: [seq_len, dim]
+        states: ([dim,], [dim,])
+        '''
+        attention_plot = np.zeros((max_length, y_enc.shape[0]))
 
-        # Decode
-        eos = self.xp.array([0], 'i')
-        ys_in = [F.concat([eos, text], axis=0) for text in texts]
-        ys_out = [F.concat([text, eos], axis=0) for text in texts]
+        h, c = states
+        y_enc = tf.expand_dims(y_enc, 0)
+        dec_hidden = tf.expand_dims(h, 0)
+        dec_cell = tf.expand_dims(c, 0)
+        dec_input = tf.constant(start_token, tf.int32, [1])
+        result = []
 
-        texts_embed = sequence_embed(self.F, ys_in)
-        batch = len(texts)
+        for t in range(max_length):
+            predictions, dec_hidden, dec_cell, attention_weights = self.call(
+                dec_input, dec_hidden, dec_cell, y_enc)
 
-        _, _, os = self.decoder(hx, cx, ys, texts_embed)  # cx: (n_layers, batch, dim) <- WTF
+            # storing the attention weigths to plot later on
+            attention_weights = tf.reshape(attention_weights, (-1, ))
+            attention_plot[t] = attention_weights.numpy()
 
-        # Loss
-        concat_os = F.concat(os, axis=0)
-        concat_ys_out = F.concat(ys_out, axis=0)
-        loss = F.sum(F.softmax_cross_entropy(
-            self.W(concat_os), concat_ys_out, reduce='no')) / batch
+            predicted_id = tf.argmax(predictions[0]).numpy()
 
-        return(loss)
+            result.append(predicted_id)
 
-    def translate(self, seq, max_length=100):
-        with chainer.no_backprop_mode(), chainer.using_config('train', False):
-            batch = len(seq)
-            hx, cx, y_enc = self.encode(seq)
-            ys = self.xp.full(batch, 0, 'i')
-            h, c = hx, cx
-            result = []
-            for i in range(max_length):
-                eys = self.F(ys)
-                eys = F.split_axis(eys, batch, 0)
-                h, c, ys = self.decoder(h, c, y_enc, eys)
-                cys = F.concat(ys, axis=0)
-                wy = self.W(cys)
-                ys = self.xp.argmax(wy.data, axis=1).astype('i')
-                result.append(ys)
-            result = cuda.to_cpu(self.xp.concatenate(
-                [self.xp.expand_dims(x, 0) for x in result]).T)
-            # Remove EOS taggs
-            outs = []
-            for y in result:
-                inds = numpy.argwhere(y == 0)
-                if len(inds) > 0:
-                    y = y[:inds[0, 0]]
-                outs.append(y)
-            return(outs)
+            if predicted_id == end_token:
+                return result, attention_plot[:t]
 
-    def beamseach(self, seq, width=3, max_length=100):
-        with chainer.no_backprop_mode(), chainer.using_config('train', False):
-            h, c, y_enc = self.encode([seq])
-            ys = self.xp.full(1, 0, 'i')
-            hyps = [(h, c, ys, 0.0, [])]
-            for i in range(max_length):
-                new_hyps = []
-                for h, c, ys, prob, result in hyps:
-                    eys = self.F(ys)
-                    eys = F.split_axis(eys.data, eys.shape[0], 0)
-                    h, c, ys = self.decoder(h, c, y_enc, eys)
-                    cys = F.concat(ys, 0).data
-                    output_prob = F.softmax(self.W(cys)).data
-                    log_prob = self.xp.log(output_prob)[0]
-                    log_prob[self.xp.isnan(log_prob)] = - self.xp.float32("inf")
-                    ys_order = self.xp.argsort(log_prob).astype('i')[::-1]
-                    for y in ys_order[:5]:
-                        if len(result) > 0 and result[-1] == 0:
-                            new_hyps.append(
-                                (h.data, c.data, self.xp.expand_dims(y, -1), prob, result))
-                        else:
-                            new_hyps.append(
-                                (h.data, c.data, self.xp.expand_dims(y, -1),
-                                 (prob + log_prob[y]) / 6 * (
-                                    5 + len(result)), result + [y.tolist()]))
-                new_hyps = sorted(new_hyps, key=lambda x: x[3], reverse=True)[:5]
-                hyps = new_hyps
-            y = numpy.array(hyps[0][4])
-            inds = numpy.argwhere(y == 0)
-            if len(inds) > 0:
-                y = y[:inds[0, 0]]
-            return y
+            # the predicted ID is fed back into the model
+            dec_input = tf.expand_dims(predicted_id, 0)
 
-    def beamseach_batch(self, seq, width=3, max_length=100):
-        return [self.beamseach(s, width, max_length) for s in seq]
+        return result, attention_plot
+
+    def call(self, x, hidden, cell, enc_y):
+        # enc_y shape == (batch_size, max_length, hidden_size)
+
+        # hidden shape == (batch_size, hidden size)
+        # hidden_with_time_axis shape == (batch_size, 1, hidden size)
+        # we are doing this to perform addition to calculate the score
+        hidden_with_time_axis = tf.expand_dims(hidden, 1)
+
+        # score shape == (batch_size, max_length, hidden_size)
+        score = tf.nn.tanh(self.W1(enc_y) + self.W2(hidden_with_time_axis))
+
+        # attention_weights shape == (batch_size, max_length, 1)
+        # we get 1 at the last axis because we are applying score to self.V
+        attention_weights = tf.nn.softmax(self.V(score), axis=1)
+
+        # context_vector shape after sum == (batch_size, hidden_size)
+        context_vector = attention_weights * enc_y
+        context_vector = tf.reduce_sum(context_vector, axis=1)
+
+        # x shape after passing through embedding == (batch_size, 1, embedding_dim)
+        x = tf.expand_dims(self.F(x), 1)
+
+        # x shape after concatenation == (batch_size, 1, embedding_dim + hidden_size)
+        x = tf.concat([tf.expand_dims(context_vector, 1), x], axis=-1)
+
+        # passing the concatenated vector to the GRU
+        output, state, cell = self.gru(x, (hidden, cell))
+
+        # output shape == (batch_size * 1, hidden_size)
+        output = tf.reshape(output, (-1, output.shape[2]))
+
+        # output shape == (batch_size * 1, vocab)
+        x = self.fc(output)
+
+        return x, state, cell, attention_weights

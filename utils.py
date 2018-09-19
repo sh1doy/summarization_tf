@@ -1,6 +1,5 @@
 """Utilities"""
-from chainer.dataset import to_device
-from chainer import functions as F
+import tensorflow as tf
 import numpy as np
 import pydot
 from collections import defaultdict
@@ -17,6 +16,7 @@ class Node:
 
 class TreeLSTMNode:
     def __init__(self, h, c=None, parent=None, children=[], num=0):
+        self.label = None
         self.h = h
         self.c = c
         self.parent = parent  # TreeLSTMNode
@@ -109,45 +109,6 @@ def consult_tree(root, dic):
     return nodes[0]
 
 
-def to_device0(x):
-    return(to_device(0, x))
-
-
-def sequence_embed(embed, xs):
-    x_len = [len(x) for x in xs]
-    x_section = np.cumsum(x_len[:-1])
-    ex = embed(F.concat(xs, axis=0))
-    exs = F.split_axis(ex, x_section, 0)
-    return exs
-
-
-def get_sequence_mask(xs, xp):
-    x_len = np.array([len(x) for x in xs], "int32")
-    mask = xp.tile(xp.arange(x_len.max()).reshape(1, -1), (x_len.shape[0], 1))
-    mask = mask < xp.array(x_len).reshape(-1, 1)
-    return mask
-
-
-def get_tree_from_dot_file(path):
-    graph = pydot.graph_from_dot_file(path)[0]
-    nodes = graph.get_nodes()
-    edges = graph.get_edges()
-    dic = {n.get_name(): Node(label=n.get_label(), parent=None, children=[]) for n in nodes}
-    for e in edges:
-        dic[e.get_source()].children.append(dic[e.get_destination()])
-        dic[e.get_destination()].parent = dic[e.get_source()]
-    return dic["n0"]
-
-
-def temp_escaper(path):
-    text = open(path, "r").read()
-    escape_seq = "value=\'\"\'"
-    after = "value=\\\'\\\"\\\'"
-    if escape_seq in text:
-        text = text.replace(escape_seq, after)
-    open(path, "w").write(text)
-
-
 def depth_split(root, depth=0):
     '''
     root: Node or LSTMNode
@@ -178,8 +139,55 @@ def sequence_apply(func, xs):
     xs: list of [any, dim]
     return: list of func([any, dim])
     '''
-    x_len = [len(x) for x in xs]
-    x_section = np.cumsum(x_len[:-1])
-    ex = func(F.concat(xs, axis=0))
-    exs = F.split_axis(ex, x_section, 0)
+    x_len = [x.shape[0] for x in xs]
+    ex = func(tf.concat(xs, axis=0))
+    exs = tf.split(ex, x_len, 0)
     return exs
+
+
+def he_normal():
+    return tf.keras.initializers.he_normal()
+
+
+def get_sequence_mask(xs):
+    x_len = tf.constant([x.shape[0] for x in xs], tf.int32)
+    mask = tf.tile(tf.reshape(tf.range(0, tf.reduce_max(x_len),
+                                       dtype=tf.int32), (1, -1)), (x_len.shape[0], 1))
+    mask = mask < tf.reshape(x_len, (-1, 1))
+    return mask
+
+
+def pad_tensor(ys):
+    length = [y.shape[0] for y in ys]
+    max_length = max(length)
+    ys = tf.stack([tf.pad(y, tf.constant([[0, max_length - y.shape[0]], [0, 0]])) for y in ys])
+    mask = tf.tile(tf.reshape(tf.range(0, max_length, dtype=tf.int32), (1, -1)), (len(length), 1))
+    mask = mask < tf.reshape(tf.constant(length), (-1, 1))
+    return ys, mask
+
+
+def depth_split_batch2(roots):
+    '''
+    roots: list of Node
+    return: dict
+    '''
+    res = defaultdict(list)
+    for root in roots:
+        for k, v in depth_split(root).items():
+            res[k] += v
+    for k, v in res.items():
+        for e, n in enumerate(v):
+            n.num = e + 1
+    return res
+
+
+class GeneratorLen(object):
+    def __init__(self, gen, length):
+        self.gen = gen
+        self.length = length
+
+    def __len__(self):
+        return self.length
+
+    def __iter__(self):
+        return self.gen

@@ -34,7 +34,26 @@ def is_invalid_com(s):
 
 
 def is_invalid_seq(s):
-    return len(s) < 3
+    return len(s) < 4
+
+
+def get_method_name(root):
+    for c in root.children:
+        if c.label == "name (SimpleName)":
+            return c.children[0].label[12:-1]
+
+
+def is_invalid_tree(root):
+    labels = traverse_label(root)
+    if root.label == 'root (ConstructorDeclaration)':
+        return True
+    if len(labels) > 500:
+        return True
+    method_name = get_method_name(root)
+    for word in ["test", "Test", "set", "Set", "get", "Get"]:
+        if method_name[:len(word)] == word:
+            return True
+    return False
 
 
 def clean_nl(s):
@@ -48,7 +67,7 @@ def clean_nl(s):
 
 
 def tokenize(s):
-    return ["</s>"] + nltk.word_tokenize(s) + ["<s>"]
+    return ["<s>"] + nltk.word_tokenize(s) + ["</s>"]
 
 
 def parse_dir(path_to_dir):
@@ -64,6 +83,9 @@ def parse_dir(path_to_dir):
         if is_invalid_com(nl):
             skip += 1
             continue
+        if is_invalid_tree(tree):
+            skip += 1
+            continue
         number = int(file.split("/")[-1])
         seq = tokenize(nl)
         if is_invalid_seq(seq):
@@ -73,14 +95,14 @@ def parse_dir(path_to_dir):
         with open("./dataset/tree_raw/" + set_name + "/" + str(number), "wb", 1) as f:
             pickle.dump(tree, f)
 
-    print("{} files skipped (invalid comment)".format(skip))
+    print("{} files skipped".format(skip))
 
     if set_name == "train":
         vocab = Counter([x for l in nls.values() for x in l])
         nl_i2w = {i: w for i, w in enumerate(
-            ["<UNK>"] + sorted([x[0] for x in vocab.most_common(30000)]))}
+            ["<PAD>", "<UNK>"] + sorted([x[0] for x in vocab.most_common(30000)]))}
         nl_w2i = {w: i for i, w in enumerate(
-            ["<UNK>"] + sorted([x[0] for x in vocab.most_common(30000)]))}
+            ["<PAD>", "<UNK>"] + sorted([x[0] for x in vocab.most_common(30000)]))}
         pickle.dump(nl_i2w, open("./dataset/nl_i2w.pkl", "wb"))
         pickle.dump(nl_w2i, open("./dataset/nl_w2i.pkl", "wb"))
 
@@ -216,14 +238,15 @@ def modifier(root, dic):
                     node.label = "Value_<NUM>"
                 else:
                     node.label = "Value_<STR>"
-        node.label = get_bracket(node.label)
+        else:
+            node.label = get_bracket(node.label)
         if node.label not in dic:
             raise Exception("Unknown word", node.label)
 
     return root
 
 
-def rebuild_tree(path, dst, dic: set):
+def rebuild_tree(path, dst, dic):
     root = pickle.load(open(path, "rb"))
     root = remove_SimpleName(root)
     root = modifier(root, dic)
