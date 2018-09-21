@@ -284,6 +284,7 @@ def preprocess_trees():
 
 
 if __name__ == "__main__":
+    nltk.download('punkt')
     sys.setrecursionlimit(10000)
     pickling()
     make_dict()
