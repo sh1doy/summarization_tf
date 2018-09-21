@@ -245,7 +245,6 @@ class Datagen_tree:
             y_raw = [[self.nl_dic[t] for t in s] for s in y]
             x = [consult_tree(n, self.code_dic) for n in x_raw]
             x_raw = [traverse_label(n) for n in x_raw]
-#             y = [np.array(yy, "int32") for yy in y]
             y = tf.constant(
                 tf.keras.preprocessing.sequence.pad_sequences(
                     y,
