@@ -203,7 +203,7 @@ def make_dict():
     values_list = [x[0] for x in values.most_common(1000)]
 
     vocab = ["<UNK>", "SimpleName_<UNK>", "Value_<NUM>", "Value_<STR>"]
-    vocab += non_terminals + ids_list + values_list
+    vocab += non_terminals + ids_list + values_list + ["(", ")"]
 
     code_i2w = {i: w for i, w in enumerate(vocab)}
     code_w2i = {w: i for i, w in enumerate(vocab)}

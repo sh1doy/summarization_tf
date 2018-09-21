@@ -1,7 +1,7 @@
 """Utilities"""
 import tensorflow as tf
 import numpy as np
-import pydot
+import math
 from collections import defaultdict
 import pickle
 
@@ -35,7 +35,7 @@ def remove_identifier(root, mark="\"identifier=", replacement="$ID"):
 
 def print_traverse(root, indent=0):
     """print tree structure"""
-    print(" " * indent + root.label)
+    print(" " * indent + str(root.label))
     for child in root.children:
         print_traverse(child, indent + 2)
 
@@ -191,3 +191,23 @@ class GeneratorLen(object):
 
     def __iter__(self):
         return self.gen
+
+
+def ngram(words, n):
+    return list(zip(*(words[i:] for i in range(n))))
+
+
+def bleu4(true, pred):
+    c = len(pred)
+    r = len(true)
+    bp = 1. if c > r else np.exp(1 - r / c)
+    score = 0
+    for i in range(1, 5):
+        true_ngram = set(ngram(true, i))
+        pred_ngram = ngram(pred, i)
+        length = float(len(pred_ngram)) + 1e-10
+        count = sum([1. if t in true_ngram else 0. for t in pred_ngram])
+        score += math.log(1e-10 + (count / length))
+    score = math.exp(score * .25)
+    bleu = bp * score
+    return bleu

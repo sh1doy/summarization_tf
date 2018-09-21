@@ -68,7 +68,7 @@ class AttentionDecoder(tf.keras.Model):
                 dec_input, dec_hidden, dec_cell, y_enc)
 
             # storing the attention weigths to plot later on
-            attention_weights = tf.reshape(attention_weights, (-1, ))
+            attention_weights = tf.reshape(attention_weights, (-1,))
             attention_plot[t] = attention_weights.numpy()
 
             predicted_id = tf.argmax(predictions[0]).numpy()
@@ -76,7 +76,7 @@ class AttentionDecoder(tf.keras.Model):
             result.append(predicted_id)
 
             if predicted_id == end_token:
-                return result, attention_plot[:t]
+                return result[:-1], attention_plot[:t]
 
             # the predicted ID is fed back into the model
             dec_input = tf.expand_dims(predicted_id, 0)
