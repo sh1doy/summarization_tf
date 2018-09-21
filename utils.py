@@ -4,6 +4,7 @@ import numpy as np
 import math
 from collections import defaultdict
 import pickle
+from prefetch_generator import BackgroundGenerator
 
 
 class Node:
@@ -211,3 +212,43 @@ def bleu4(true, pred):
     score = math.exp(score * .25)
     bleu = bp * score
     return bleu
+
+
+class Datagen_tree:
+    def __init__(self, X, Y, batch_size, code_dic, nl_dic, train=True):
+        self.X = X
+        self.Y = Y
+        self.batch_size = batch_size
+        self.code_dic = code_dic
+        self.nl_dic = nl_dic
+        self.train = train
+
+    def __len__(self):
+        return len(range(0, len(self.X), self.batch_size))
+
+    def __call__(self, epoch=0):
+        return GeneratorLen(BackgroundGenerator(self.gen(epoch), 2), len(self))
+
+    def gen(self, epoch):
+        if self.train:
+            np.random.seed(epoch)
+            newindex = list(np.random.permutation(len(self.X)))
+            X = [self.X[i] for i in newindex]
+            Y = [self.Y[i] for i in newindex]
+        else:
+            X = [x for x in self.X]
+            Y = [y for y in self.Y]
+        for i in range(0, len(self.X), self.batch_size):
+            x = X[i:i + self.batch_size]
+            y = Y[i:i + self.batch_size]
+            x_raw = [read_pickle(n) for n in x]
+            y_raw = [[self.nl_dic[t] for t in s] for s in y]
+            x = [consult_tree(n, self.code_dic) for n in x_raw]
+            x_raw = [traverse_label(n) for n in x_raw]
+#             y = [np.array(yy, "int32") for yy in y]
+            y = tf.constant(
+                tf.keras.preprocessing.sequence.pad_sequences(
+                    y,
+                    min(max([len(s) for s in y]), 100),
+                    padding="post", truncating="post", value=-1.))
+            yield x, y, x_raw, y_raw
