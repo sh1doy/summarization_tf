@@ -24,7 +24,7 @@ class AttentionDecoder(tf.keras.Model):
         loss_ = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=real, logits=pred)
         return tf.reduce_sum(loss_)
 
-    def get_loss(self, enc_y, states, target):
+    def get_loss(self, enc_y, states, target, dropout=0.0):
         '''
         enc_y: batch_size([seq_len, dim])
         states: ([batch, dim], [batch, dim])
@@ -33,6 +33,7 @@ class AttentionDecoder(tf.keras.Model):
         mask = tf.not_equal(target, -1.)
         h, c = states
         enc_y, _ = pad_tensor(enc_y)
+        enc_y = tf.nn.dropout(enc_y, 1. - dropout)
         dec_hidden = h
         dec_cell = c
         dec_input = target[:, 0]
@@ -67,12 +68,10 @@ class AttentionDecoder(tf.keras.Model):
             predictions, dec_hidden, dec_cell, attention_weights = self.call(
                 dec_input, dec_hidden, dec_cell, y_enc)
 
-            # storing the attention weigths to plot later on
             attention_weights = tf.reshape(attention_weights, (-1,))
             attention_plot[t] = attention_weights.numpy()
 
             predicted_id = tf.argmax(predictions[0]).numpy()
-
             result.append(predicted_id)
 
             if predicted_id == end_token:
