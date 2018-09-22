@@ -173,8 +173,8 @@ class BiLSTM(tf.keras.Model):
                                                      initializer=he_normal()))
         self.h_init_b = tfe.Variable(tf.get_variable("h_init_b", [1, dim], tf.float32,
                                                      initializer=he_normal()))
-        self.Cell_f = tf.nn.rnn_cell.LSTMCell(dim, initializer=he_normal())
-        self.Cell_b = tf.nn.rnn_cell.LSTMCell(dim, initializer=he_normal())
+        self.Cell_f = tf.contrib.rnn.LSTMBlockCell(dim)
+        self.Cell_b = tf.contrib.rnn.LSTMBlockCell(dim)
         self.fc = tf.keras.layers.Dense(dim, use_bias=False)
         self.return_seq = return_seq
 
