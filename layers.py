@@ -270,3 +270,18 @@ class ShidoTreeLSTM(tf.keras.Model):
             n.h = h
 
         return new_h, new_c
+
+
+class TreeDropout(tf.keras.Model):
+    def __init__(self, rate):
+        super(TreeDropout, self).__init__()
+        self.dropout_layer = tf.keras.layers.Dropout(rate)
+
+    def call(self, roots):
+        nodes = [node for root in roots for node in traverse(root)]
+        ys = [node.h for node in nodes]
+        tensor = tf.stack(ys)
+        dropped = self.dropout_layer(tensor)
+        for e, v in enumerate(tf.split(dropped, len(ys))):
+            nodes[e].h = tf.squeeze(v)
+        return roots
