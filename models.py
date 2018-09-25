@@ -117,3 +117,46 @@ class AttentionDecoder(tf.keras.Model):
         x = self.fc(output)
 
         return x, state, cell, attention_weights
+
+
+class BaseModel(tf.keras.Model):
+    def __init__(self, dim_E, dim_F, dim_rep, in_vocab, out_vocab, layer=1, dropout=0., lr=1e-3):
+        super(BaseModel, self).__init__()
+        self.dim_E = dim_E
+        self.dim_F = dim_F
+        self.dim_rep = dim_rep
+        self.in_vocab = in_vocab
+        self.out_vocab = out_vocab
+        self.dropout = dropout
+        self.decoder = AttentionDecoder(dim_F, dim_rep, out_vocab)
+        self.optimizer = tf.train.AdamOptimizer(lr)
+
+    def encode(self, trees):
+        '''
+        ys: list of [seq_len, dim]
+        hx, cx: [batch, dim]
+        return: ys, [hx, cx]
+        '''
+
+    def train_on_batch(self, x, y):
+        with tf.GradientTape() as tape:
+            y_enc, (c, h) = self.encode(x)
+            loss = self.decoder.get_loss(y_enc, (c, h), y, dropout=self.dropout)
+            variables = self.variables
+            gradients = tape.gradient(loss, variables)
+            self.optimizer.apply_gradients(zip(gradients, variables))
+        return loss.numpy()
+
+    def translate(self, x, nl_i2w, nl_w2i, max_length=100):
+        res = []
+        y_enc, (c, h) = self.encode(x)
+        for i in range(len(x)):
+            nl, _ = self.decoder.translate(
+                y_enc[i], (c[i], h[i]), max_length, nl_w2i["<s>"], nl_w2i["</s>"])
+            res.append([nl_i2w[n] for n in nl])
+        return res
+
+    def evaluate_on_batch(self, x, y):
+        y_enc, (c, h) = self.encode(x)
+        loss = self.decoder.get_loss(y_enc, (c, h), y)
+        return loss.numpy()
