@@ -173,8 +173,8 @@ class BiLSTM(tf.keras.Model):
                                                      initializer=he_normal()))
         self.h_init_b = tfe.Variable(tf.get_variable("h_init_b", [1, dim], tf.float32,
                                                      initializer=he_normal()))
-        self.Cell_f = tf.contrib.rnn.LSTMBlockCell(dim)
-        self.Cell_b = tf.contrib.rnn.LSTMBlockCell(dim)
+        self.Cell_f = tf.contrib.cudnn_rnn.CudnnCompatibleLSTMCell(dim)
+        self.Cell_b = tf.contrib.cudnn_rnn.CudnnCompatibleLSTMCell(dim)
         self.fc = tf.keras.layers.Dense(dim, use_bias=False)
         self.return_seq = return_seq
 
@@ -285,3 +285,48 @@ class TreeDropout(tf.keras.Model):
         for e, v in enumerate(tf.split(dropped, len(ys))):
             nodes[e].h = tf.squeeze(v)
         return roots
+
+
+class SetEmbeddingLayer(tf.keras.Model):
+    def __init__(self, dim_E, in_vocab):
+        super(SetEmbeddingLayer, self).__init__()
+        self.E = tf.get_variable("E", [in_vocab, dim_E], tf.float32,
+                                 initializer=he_normal())
+
+    def call(self, sets):
+        length = [len(s) for s in sets]
+        concatenated = tf.concat(sets, 0)
+        embedded = tf.nn.embedding_lookup(self.E, concatenated)
+        y = tf.split(embedded, length)
+        return y
+
+
+class LSTMEncoder(tf.keras.Model):
+    def __init__(self, dim, layer=1):
+        super(LSTMEncoder, self).__init__()
+        self.dim = dim
+        self.c_init_f = tfe.Variable(tf.get_variable("c_init_f", [1, dim], tf.float32,
+                                                     initializer=he_normal()))
+        self.h_init_f = tfe.Variable(tf.get_variable("h_initf", [1, dim], tf.float32,
+                                                     initializer=he_normal()))
+        self.Cell_f = tf.contrib.cudnn_rnn.CudnnCompatibleLSTMCell(dim)
+
+    def call(self, x, length):
+        '''x: [batch, length, dim]'''
+        batch = x.shape[0]
+        ys, states = tf.nn.dynamic_rnn(self.Cell_f, x,
+                                       length,
+                                       tf.nn.rnn_cell.LSTMStateTuple(
+                                           tf.tile(self.c_init_f, [batch, 1]),
+                                           tf.tile(self.h_init_f, [batch, 1])))
+        return ys, states
+
+
+class SequenceEmbeddingLayer(tf.keras.Model):
+    def __init__(self, dim_E, in_vocab):
+        super(SequenceEmbeddingLayer, self).__init__()
+        self.E = tf.keras.layers.Embedding(in_vocab, dim_E)
+
+    def call(self, y):
+        y = self.E(y)
+        return y

@@ -1,5 +1,6 @@
 import tensorflow as tf
 from utils import pad_tensor
+from layers import *
 import numpy as np
 
 
@@ -34,8 +35,8 @@ class AttentionDecoder(tf.keras.Model):
         h, c = states
         enc_y, _ = pad_tensor(enc_y)
         enc_y = tf.nn.dropout(enc_y, 1. - dropout)
-        dec_hidden = h
-        dec_cell = c
+        dec_hidden = tf.nn.dropout(h, 1. - dropout)
+        dec_cell = tf.nn.dropout(c, 1. - dropout)
         dec_input = target[:, 0]
         loss = 0
         for t in range(1, target.shape[1]):
@@ -150,7 +151,7 @@ class BaseModel(tf.keras.Model):
     def translate(self, x, nl_i2w, nl_w2i, max_length=100):
         res = []
         y_enc, (c, h) = self.encode(x)
-        for i in range(len(x)):
+        for i in range(len(x) if type(x) is list else x.shape[0]):
             nl, _ = self.decoder.translate(
                 y_enc[i], (c[i], h[i]), max_length, nl_w2i["<s>"], nl_w2i["</s>"])
             res.append([nl_i2w[n] for n in nl])
@@ -160,3 +161,74 @@ class BaseModel(tf.keras.Model):
         y_enc, (c, h) = self.encode(x)
         loss = self.decoder.get_loss(y_enc, (c, h), y)
         return loss.numpy()
+
+
+class CodennModel(BaseModel):
+    def __init__(self, dim_E, dim_F, dim_rep, in_vocab, out_vocab, layer=1, dropout=0.5, lr=1e-3):
+        super(CodennModel, self).__init__(dim_E, dim_F, dim_rep, in_vocab,
+                                          out_vocab, layer, dropout, lr)
+        self.E = SetEmbeddingLayer(dim_E, in_vocab)
+
+    def encode(self, sets):
+        sets = self.E(sets)
+
+        hx = tf.zeros([len(sets), self.dim_rep])
+        cx = tf.zeros([len(sets), self.dim_rep])
+        ys = sets
+
+        return ys, [hx, cx]
+
+
+class Seq2seqModel(BaseModel):
+    def __init__(self, dim_E, dim_F, dim_rep, in_vocab, out_vocab, layer=1, dropout=0.5, lr=1e-3):
+        super(Seq2seqModel, self).__init__(dim_E, dim_F,
+                                           dim_rep, in_vocab, out_vocab, layer, dropout, lr)
+        self.E = SequenceEmbeddingLayer(dim_E, in_vocab)
+        self.encoder = LSTMEncoder(dim_E, dim_rep)
+
+    def encode(self, seq):
+        length = get_length(seq)
+        seq = self.E(seq)
+        ys, states = self.encoder(seq, length)
+
+        cx = states.c
+        hx = states.h
+        ys = [y[:i] for y, i in zip(tf.unstack(ys, axis=0), length.numpy())]
+
+        return ys, [hx, cx]
+
+
+class ChildsumModel(BaseModel):
+    def __init__(self, dim_E, dim_F, dim_rep, in_vocab, out_vocab, layer=1, dropout=0.5, lr=1e-4):
+        super(ChildsumModel, self).__init__(dim_E, dim_F,
+                                            dim_rep, in_vocab, out_vocab, layer, dropout, lr)
+        self.E = TreeEmbeddingLayer(dim_E, in_vocab)
+        self.encoder = ChildSumLSTMLayer(dim_E, dim_rep)
+
+    def encode(self, trees):
+        trees = self.E(trees)
+        trees = self.encoder(trees)
+
+        hx = tf.stack([tree.h for tree in trees])
+        cx = tf.stack([tree.c for tree in trees])
+        ys = [tf.stack([node.h for node in traverse(tree)]) for tree in trees]
+
+        return ys, [hx, cx]
+
+
+class MultiwayModel(BaseModel):
+    def __init__(self, dim_E, dim_F, dim_rep, in_vocab, out_vocab, layer=1, dropout=0.0, lr=1e-4):
+        super(MultiwayModel, self).__init__(dim_E, dim_F,
+                                            dim_rep, in_vocab, out_vocab, layer, dropout, lr)
+        self.E = TreeEmbeddingLayer(dim_E, in_vocab)
+        self.encoder = ShidoTreeLSTM(dim_E, dim_rep)
+
+    def encode(self, trees):
+        trees = self.E(trees)
+        trees = self.encoder(trees)
+
+        hx = tf.stack([tree.h for tree in trees])
+        cx = tf.stack([tree.c for tree in trees])
+        ys = [tf.stack([node.h for node in traverse(tree)]) for tree in trees]
+
+        return ys, [hx, cx]

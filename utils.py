@@ -201,7 +201,7 @@ def ngram(words, n):
 def bleu4(true, pred):
     c = len(pred)
     r = len(true)
-    bp = 1. if c > r else np.exp(1 - r / c)
+    bp = 1. if c > r else np.exp(1 - r / (c + 1e-10))
     score = 0
     for i in range(1, 5):
         true_ngram = set(ngram(true, i))
@@ -227,7 +227,7 @@ class Datagen_tree:
         return len(range(0, len(self.X), self.batch_size))
 
     def __call__(self, epoch=0):
-        return GeneratorLen(BackgroundGenerator(self.gen(epoch), 2), len(self))
+        return GeneratorLen(BackgroundGenerator(self.gen(epoch), 1), len(self))
 
     def gen(self, epoch):
         if self.train:
@@ -251,3 +251,102 @@ class Datagen_tree:
                     min(max([len(s) for s in y]), 100),
                     padding="post", truncating="post", value=-1.))
             yield x, y, x_raw, y_raw
+
+
+class Datagen_set:
+    def __init__(self, X, Y, batch_size, code_dic, nl_dic, train=True):
+        self.X = X
+        self.Y = Y
+        self.batch_size = batch_size
+        self.code_dic = code_dic
+        self.nl_dic = nl_dic
+        self.train = train
+
+    def __len__(self):
+        return len(range(0, len(self.X), self.batch_size))
+
+    def __call__(self, epoch=0):
+        return GeneratorLen(BackgroundGenerator(self.gen(epoch), 1), len(self))
+
+    def gen(self, epoch):
+        if self.train:
+            np.random.seed(epoch)
+            newindex = list(np.random.permutation(len(self.X)))
+            X = [self.X[i] for i in newindex]
+            Y = [self.Y[i] for i in newindex]
+        else:
+            X = [x for x in self.X]
+            Y = [y for y in self.Y]
+        for i in range(0, len(self.X), self.batch_size):
+            x = X[i:i + self.batch_size]
+            y = Y[i:i + self.batch_size]
+            x_raw = [read_pickle(n) for n in x]
+            y_raw = [[self.nl_dic[t] for t in s] for s in y]
+            x = [traverse_label(n) for n in x_raw]
+            x = [np.array([self.code_dic[t] for t in xx], "int32") for xx in x]
+            x_raw = [traverse_label(n) for n in x_raw]
+            y = tf.constant(
+                tf.keras.preprocessing.sequence.pad_sequences(
+                    y,
+                    min(max([len(s) for s in y]), 100),
+                    padding="post", truncating="post", value=-1.))
+            yield x, y, x_raw, y_raw
+
+
+def sequencing(root):
+    li = ["(", root.label]
+    for child in root.children:
+        li += sequencing(child)
+    li += [")", root.label]
+    return(li)
+
+
+class Datagen_deepcom:
+    def __init__(self, X, Y, batch_size, code_dic, nl_dic, train=True):
+        self.X = X
+        self.Y = Y
+        self.batch_size = batch_size
+        self.code_dic = code_dic
+        self.nl_dic = nl_dic
+        self.train = train
+
+    def __len__(self):
+        return len(range(0, len(self.X), self.batch_size))
+
+    def __call__(self, epoch=0):
+        return GeneratorLen(BackgroundGenerator(self.gen(epoch), 1), len(self))
+
+    def gen(self, epoch):
+        if self.train:
+            np.random.seed(epoch)
+            newindex = list(np.random.permutation(len(self.X)))
+            X = [self.X[i] for i in newindex]
+            Y = [self.Y[i] for i in newindex]
+        else:
+            X = [x for x in self.X]
+            Y = [y for y in self.Y]
+        for i in range(0, len(self.X), self.batch_size):
+            x = X[i:i + self.batch_size]
+            y = Y[i:i + self.batch_size]
+            x_raw = [read_pickle(n) for n in x]
+            y_raw = [[self.nl_dic[t] for t in s] for s in y]
+            x = [sequencing(n) for n in x_raw]
+            x = [np.array([self.code_dic[t] for t in xx], "int32") for xx in x]
+            x = tf.constant(
+                tf.keras.preprocessing.sequence.pad_sequences(
+                    x,
+                    min(max([len(s) for s in x]), 400),
+                    padding="post", truncating="post", value=-1.))
+            x_raw = [traverse_label(n) for n in x_raw]
+            y = tf.constant(
+                tf.keras.preprocessing.sequence.pad_sequences(
+                    y,
+                    min(max([len(s) for s in y]), 100),
+                    padding="post", truncating="post", value=-1.))
+            yield x, y, x_raw, y_raw
+
+
+def get_length(tensor, pad_value=-1.):
+    '''tensor: [batch, max_len]'''
+    mask = tf.not_equal(tensor, pad_value)
+    return tf.reduce_sum(tf.cast(mask, tf.int32), 1)
