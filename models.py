@@ -198,12 +198,46 @@ class Seq2seqModel(BaseModel):
         return ys, [hx, cx]
 
 
+class ChildsumModel_old(BaseModel):
+    def __init__(self, dim_E, dim_F, dim_rep, in_vocab, out_vocab, layer=1, dropout=0.5, lr=1e-4):
+        super(ChildsumModel_old, self).__init__(dim_E, dim_F,
+                                                dim_rep, in_vocab, out_vocab, layer, dropout, lr)
+        self.E = TreeEmbeddingLayer(dim_E, in_vocab)
+        self.encoder = ChildSumLSTMLayer(dim_E, dim_rep)
+
+    def encode(self, trees):
+        trees = self.E(trees)
+        trees = self.encoder(trees)
+
+        hx = tf.stack([tree.h for tree in trees])
+        cx = tf.stack([tree.c for tree in trees])
+        ys = [tf.stack([node.h for node in traverse(tree)]) for tree in trees]
+
+        return ys, [hx, cx]
+
+
 class ChildsumModel(BaseModel):
     def __init__(self, dim_E, dim_F, dim_rep, in_vocab, out_vocab, layer=1, dropout=0.5, lr=1e-4):
         super(ChildsumModel, self).__init__(dim_E, dim_F,
                                             dim_rep, in_vocab, out_vocab, layer, dropout, lr)
+        self.encoder = ChildSumLSTMLayerWithEmbedding(in_vocab, dim_E, dim_rep)
+
+    def encode(self, trees):
+        trees = self.encoder(trees)
+
+        hx = tf.stack([tree.h for tree in trees])
+        cx = tf.stack([tree.c for tree in trees])
+        ys = [tf.stack([node.h for node in traverse(tree)]) for tree in trees]
+
+        return ys, [hx, cx]
+
+
+class MultiwayModel_old(BaseModel):
+    def __init__(self, dim_E, dim_F, dim_rep, in_vocab, out_vocab, layer=1, dropout=0.0, lr=1e-4):
+        super(MultiwayModel_old, self).__init__(dim_E, dim_F,
+                                                dim_rep, in_vocab, out_vocab, layer, dropout, lr)
         self.E = TreeEmbeddingLayer(dim_E, in_vocab)
-        self.encoder = ChildSumLSTMLayer(dim_E, dim_rep)
+        self.encoder = ShidoTreeLSTM(dim_E, dim_rep)
 
     def encode(self, trees):
         trees = self.E(trees)
@@ -220,11 +254,9 @@ class MultiwayModel(BaseModel):
     def __init__(self, dim_E, dim_F, dim_rep, in_vocab, out_vocab, layer=1, dropout=0.0, lr=1e-4):
         super(MultiwayModel, self).__init__(dim_E, dim_F,
                                             dim_rep, in_vocab, out_vocab, layer, dropout, lr)
-        self.E = TreeEmbeddingLayer(dim_E, in_vocab)
-        self.encoder = ShidoTreeLSTM(dim_E, dim_rep)
+        self.encoder = ShidoTreeLSTMWithEmbedding(in_vocab, dim_E, dim_rep)
 
     def encode(self, trees):
-        trees = self.E(trees)
         trees = self.encoder(trees)
 
         hx = tf.stack([tree.h for tree in trees])
