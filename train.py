@@ -18,6 +18,8 @@ parser.add_argument('-m', "--method", type=str, nargs="?", required=True,
                     help='Encoder method')
 parser.add_argument('-d', "--dim", type=int, nargs="?", required=False, default=512,
                     help='Representation dimension')
+parser.add_argument("--embed", type=int, nargs="?", required=False, default=256,
+                    help='Representation dimension')
 parser.add_argument("--drop", type=float, nargs="?", required=False, default=.5,
                     help="Dropout rate")
 parser.add_argument('-r', "--lr", type=float, nargs="?", required=True,
@@ -35,7 +37,8 @@ parser.add_argument("--val", type=str, nargs="?", required=False, default="BLEU"
 
 args = parser.parse_args()
 
-name = args.method + "_dim" + str(args.dim) + "_drop" + str(args.drop)
+name = args.method + "_dim" + str(args.dim) + "_embed" + str(args.embed)
+name = name + "_drop" + str(args.drop)
 name = name + "_lr" + str(args.lr) + "_batch" + str(args.batch)
 name = name + "_epochs" + str(args.epochs) + "_layer" + str(args.layer)
 
@@ -84,7 +87,7 @@ elif args.method in ['childsum']:
 elif args.method in ['multiway']:
     Model = MultiwayModel
 
-model = Model(args.dim, args.dim, args.dim, len(code_w2i), len(nl_w2i), dropout=0.5, lr=1e-3)
+model = Model(args.dim, args.dim, args.dim, len(code_w2i), len(nl_w2i), dropout=0.5, lr=args.lr)
 epochs = args.epochs
 batch_size = args.batch
 os.makedirs(checkpoint_dir, exist_ok=True)
@@ -104,9 +107,9 @@ elif args.method in ['codenn']:
 elif args.method in ['childsum', 'multiway']:
     Datagen = Datagen_tree
 
-trn_gen = Datagen(trn_x[:100], trn_y[:100], batch_size, code_w2i, nl_i2w, train=True)
-vld_gen = Datagen(vld_x[:100], vld_y[:100], batch_size, code_w2i, nl_i2w, train=False)
-tst_gen = Datagen(tst_x[:100], tst_y[:100], batch_size, code_w2i, nl_i2w, train=False)
+trn_gen = Datagen(trn_x, trn_y, batch_size, code_w2i, nl_i2w, train=True)
+vld_gen = Datagen(vld_x, vld_y, batch_size, code_w2i, nl_i2w, train=False)
+tst_gen = Datagen(tst_x, tst_y, batch_size, code_w2i, nl_i2w, train=False)
 
 
 # training
