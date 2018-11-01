@@ -87,7 +87,8 @@ elif args.method in ['childsum']:
 elif args.method in ['multiway']:
     Model = MultiwayModel
 
-model = Model(args.dim, args.dim, args.dim, len(code_w2i), len(nl_w2i), dropout=0.5, lr=args.lr)
+model = Model(args.dim, args.dim, args.dim, len(code_w2i), len(nl_w2i),
+              dropout=0.5, lr=args.lr, layer=args.layer)
 epochs = args.epochs
 batch_size = args.batch
 os.makedirs(checkpoint_dir, exist_ok=True)
@@ -100,8 +101,6 @@ history = {"loss": [], "loss_val": [], "bleu_val": []}
 
 if args.method in ['deepcom']:
     Datagen = Datagen_deepcom
-# elif args.method in ['seq2seq']:
-#     Datagen = a
 elif args.method in ['codenn']:
     Datagen = Datagen_set
 elif args.method in ['childsum', 'multiway']:
