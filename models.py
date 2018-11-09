@@ -7,6 +7,7 @@ import numpy as np
 class AttentionDecoder(tf.keras.Model):
     def __init__(self, dim_F, dim_rep, vocab_size, layer=1):
         super(AttentionDecoder, self).__init__()
+        self.layer = layer
         self.dim_rep = dim_rep
         self.F = tf.keras.layers.Embedding(vocab_size, dim_F)
         self.gru = tf.keras.layers.CuDNNLSTM(dim_rep,
@@ -115,7 +116,7 @@ class AttentionDecoder(tf.keras.Model):
 
         # passing the concatenated vector to the GRU
         output, state, cell = self.gru(x, (hidden, cell))
-        if layer > 1:
+        if self.layer > 1:
             output, state, cell = self.gru2(output, (hidden, cell))
 
         # output shape == (batch_size * 1, hidden_size)
@@ -190,16 +191,17 @@ class Seq2seqModel(BaseModel):
     def __init__(self, dim_E, dim_F, dim_rep, in_vocab, out_vocab, layer=1, dropout=0.5, lr=1e-3):
         super(Seq2seqModel, self).__init__(dim_E, dim_F,
                                            dim_rep, in_vocab, out_vocab, layer, dropout, lr)
+        self.layer = layer
         self.E = SequenceEmbeddingLayer(dim_E, in_vocab)
         self.encoder = LSTMEncoder(dim_E, dim_rep)
-        if layer > 1:
+        if self.layer > 1:
             self.additive = LSTMEncoder(dim_rep, dim_rep)
 
     def encode(self, seq):
         length = get_length(seq)
         seq = self.E(seq)
         ys, states = self.encoder(seq, length)
-        if layer > 1:
+        if self.layer > 1:
             ys, states = self.additive(ys, length)
 
         cx = states.c
@@ -232,12 +234,13 @@ class ChildsumModel(BaseModel):
         super(ChildsumModel, self).__init__(dim_E, dim_F,
                                             dim_rep, in_vocab, out_vocab, layer, dropout, lr)
         self.encoder = ChildSumLSTMLayerWithEmbedding(in_vocab, dim_E, dim_rep)
-        if layer > 1:
-            self.additive = ChildSumLSTMLayer(in_vocab, dim_E, dim_rep)
+        self.layer = layer
+        if self.layer > 1:
+            self.additive = ChildSumLSTMLayer(dim_rep, dim_rep)
 
     def encode(self, trees):
         trees = self.encoder(trees)
-        if layer > 1:
+        if self.layer > 1:
             trees = self.additive(trees)
 
         hx = tf.stack([tree.h for tree in trees])
@@ -270,12 +273,13 @@ class MultiwayModel(BaseModel):
         super(MultiwayModel, self).__init__(dim_E, dim_F,
                                             dim_rep, in_vocab, out_vocab, layer, dropout, lr)
         self.encoder = ShidoTreeLSTMWithEmbedding(in_vocab, dim_E, dim_rep)
-        if layer > 1:
-            self.additive = ShidoTreeLSTM(in_vocab, dim_E, dim_rep)
+        self.layer = layer
+        if self.layer > 1:
+            self.additive = ShidoTreeLSTM(dim_rep, dim_rep)
 
     def encode(self, trees):
         trees = self.encoder(trees)
-        if layer > 1:
+        if self.layer > 1:
             trees = self.additive(trees)
 
         hx = tf.stack([tree.h for tree in trees])
