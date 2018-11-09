@@ -16,7 +16,7 @@ class Node:
 
 
 class TreeLSTMNode:
-    def __init__(self, h, c=None, parent=None, children=[], num=0):
+    def __init__(self, h=None, c=None, parent=None, children=[], num=0):
         self.label = None
         self.h = h
         self.c = c
@@ -39,6 +39,13 @@ def print_traverse(root, indent=0):
     print(" " * indent + str(root.label))
     for child in root.children:
         print_traverse(child, indent + 2)
+
+
+def print_num_traverse(root, indent=0):
+    """print tree structure"""
+    print(" " * indent + str(root.num))
+    for child in root.children:
+        print_num_traverse(child, indent + 2)
 
 
 def traverse(root):
