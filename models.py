@@ -5,14 +5,20 @@ import numpy as np
 
 
 class AttentionDecoder(tf.keras.Model):
-    def __init__(self, dim_F, dim_rep, vocab_size):
+    def __init__(self, dim_F, dim_rep, vocab_size, layer=1):
         super(AttentionDecoder, self).__init__()
+        self.layer = layer
         self.dim_rep = dim_rep
         self.F = tf.keras.layers.Embedding(vocab_size, dim_F)
         self.gru = tf.keras.layers.CuDNNLSTM(dim_rep,
                                              return_sequences=True,
                                              return_state=True,
                                              recurrent_initializer='glorot_uniform')
+        if layer > 1:
+            self.gru2 = tf.keras.layers.CuDNNLSTM(dim_rep,
+                                                  return_sequences=True,
+                                                  return_state=True,
+                                                  recurrent_initializer='glorot_uniform')
         self.fc = tf.keras.layers.Dense(vocab_size)
 
         # used for attention
@@ -110,6 +116,8 @@ class AttentionDecoder(tf.keras.Model):
 
         # passing the concatenated vector to the GRU
         output, state, cell = self.gru(x, (hidden, cell))
+        if self.layer > 1:
+            output, state, cell = self.gru2(output, (hidden, cell))
 
         # output shape == (batch_size * 1, hidden_size)
         output = tf.reshape(output, (-1, output.shape[2]))
@@ -129,7 +137,7 @@ class BaseModel(tf.keras.Model):
         self.in_vocab = in_vocab
         self.out_vocab = out_vocab
         self.dropout = dropout
-        self.decoder = AttentionDecoder(dim_F, dim_rep, out_vocab)
+        self.decoder = AttentionDecoder(dim_F, dim_rep, out_vocab, layer)
         self.optimizer = tf.train.AdamOptimizer(lr)
 
     def encode(self, trees):
@@ -183,13 +191,18 @@ class Seq2seqModel(BaseModel):
     def __init__(self, dim_E, dim_F, dim_rep, in_vocab, out_vocab, layer=1, dropout=0.5, lr=1e-3):
         super(Seq2seqModel, self).__init__(dim_E, dim_F,
                                            dim_rep, in_vocab, out_vocab, layer, dropout, lr)
+        self.layer = layer
         self.E = SequenceEmbeddingLayer(dim_E, in_vocab)
         self.encoder = LSTMEncoder(dim_E, dim_rep)
+        if self.layer > 1:
+            self.additive = LSTMEncoder(dim_rep, dim_rep)
 
     def encode(self, seq):
         length = get_length(seq)
         seq = self.E(seq)
         ys, states = self.encoder(seq, length)
+        if self.layer > 1:
+            ys, states = self.additive(ys, length)
 
         cx = states.c
         hx = states.h
@@ -221,9 +234,14 @@ class ChildsumModel(BaseModel):
         super(ChildsumModel, self).__init__(dim_E, dim_F,
                                             dim_rep, in_vocab, out_vocab, layer, dropout, lr)
         self.encoder = ChildSumLSTMLayerWithEmbedding(in_vocab, dim_E, dim_rep)
+        self.layer = layer
+        if self.layer > 1:
+            self.additive = ChildSumLSTMLayer(dim_rep, dim_rep)
 
     def encode(self, trees):
         trees = self.encoder(trees)
+        if self.layer > 1:
+            trees = self.additive(trees)
 
         hx = tf.stack([tree.h for tree in trees])
         cx = tf.stack([tree.c for tree in trees])
@@ -255,9 +273,14 @@ class MultiwayModel(BaseModel):
         super(MultiwayModel, self).__init__(dim_E, dim_F,
                                             dim_rep, in_vocab, out_vocab, layer, dropout, lr)
         self.encoder = ShidoTreeLSTMWithEmbedding(in_vocab, dim_E, dim_rep)
+        self.layer = layer
+        if self.layer > 1:
+            self.additive = ShidoTreeLSTM(dim_rep, dim_rep)
 
     def encode(self, trees):
         trees = self.encoder(trees)
+        if self.layer > 1:
+            trees = self.additive(trees)
 
         hx = tf.stack([tree.h for tree in trees])
         cx = tf.stack([tree.c for tree in trees])
