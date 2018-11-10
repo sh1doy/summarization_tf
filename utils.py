@@ -7,6 +7,44 @@ import pickle
 from prefetch_generator import BackgroundGenerator
 
 
+def get_nums(roots):
+    '''convert roots to indices'''
+    res = [[x.num for x in n.children] if n.children != [] else [0] for n in roots]
+    max_len = max([len(x) for x in res])
+    res = tf.keras.preprocessing.sequence.pad_sequences(
+        res, max_len, padding="post", value=-1.)
+    return tf.constant(res, tf.int32)
+
+
+def tree2tensor(trees):
+    '''
+    indice:
+        this has structure data.
+        0 represent init state,
+        1<n represent children's number (1-indexed)
+    depthes:
+        these are labels of nodes at each depth.
+    tree_num:
+        explain number of tree that each node was conteined.
+    '''
+    res = defaultdict(list)
+    tree_num = defaultdict(list)
+    for e, root in enumerate(trees):
+        for k, v in depth_split(root).items():
+            res[k] += v
+            tree_num[k] += [e] * len(v)
+
+    for k, v in res.items():
+        for e, n in enumerate(v):
+            n.num = e + 1
+    depthes = [x[1] for x in sorted(res.items(), key=lambda x:-x[0])]
+    indices = [get_nums(nodes) for nodes in depthes]
+    depthes = [tf.constant([n.label for n in nn], tf.int32) for nn in depthes]
+    tree_num = [
+        tf.constant(x[1], tf.int32) for x in sorted(tree_num.items(), key=lambda x:-x[0])]
+    return depthes, indices, tree_num
+
+
 class Node:
     def __init__(self, label="", parent=None, children=[], num=0):
         self.label = label
@@ -119,7 +157,7 @@ def consult_tree(root, dic):
 
 def depth_split(root, depth=0):
     '''
-    root: Node or LSTMNode
+    root: Node
     return: dict
     '''
     res = defaultdict(list)
@@ -257,7 +295,7 @@ class Datagen_tree:
                     y,
                     min(max([len(s) for s in y]), 100),
                     padding="post", truncating="post", value=-1.))
-            yield x, y, x_raw, y_raw
+            yield tree2tensor(x), y, x_raw, y_raw
 
 
 class Datagen_set:
