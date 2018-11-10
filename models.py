@@ -277,18 +277,23 @@ class MultiwayModel(BaseModel):
     def __init__(self, dim_E, dim_F, dim_rep, in_vocab, out_vocab, layer=1, dropout=0.0, lr=1e-4):
         super(MultiwayModel, self).__init__(dim_E, dim_F,
                                             dim_rep, in_vocab, out_vocab, layer, dropout, lr)
-        self.encoder = ShidoTreeLSTMWithEmbedding(in_vocab, dim_E, dim_rep)
         self.layer = layer
-        if self.layer > 1:
-            self.additive = ShidoTreeLSTM(dim_rep, dim_rep)
+        self.E = TreeEmbeddingLayer(in_vocab, dim_E)
+        for i in range(layer):
+            self.__setattr__("layer{}".format(i), ShidoTreeLSTMLayer(dim_E, dim_rep))
 
-    def encode(self, trees):
-        trees = self.encoder(trees)
-        if self.layer > 1:
-            trees = self.additive(trees)
+    def encode(self, x):
+        tensor, indice, tree_num = x
+        tensor = self.E(tensor)
+        for i in range(self.layer):
+            tensor, c = getattr(self, "layer{}".format(i))(tensor, indice)
 
-        hx = tf.stack([tree.h for tree in trees])
-        cx = tf.stack([tree.c for tree in trees])
-        ys = [tf.stack([node.h for node in traverse(tree)]) for tree in trees]
-
+        hx = tensor[-1]
+        cx = c[-1]
+        ys = []
+        batch_size = tensor[-1].shape[0]
+        tensor = tf.concat(tensor, 0)
+        tree_num = tf.concat(tree_num, 0)
+        for batch in range(batch_size):
+            ys.append(tf.boolean_mask(tensor, tf.equal(tree_num, batch)))
         return ys, [hx, cx]

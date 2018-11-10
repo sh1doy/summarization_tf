@@ -288,9 +288,72 @@ class BiLSTM(tf.keras.Model):
             return self.fc(state_concat)
 
 
-class ShidoTreeLSTM(tf.keras.Model):
+class ShidoTreeLSTMLayer(tf.keras.Model):
     def __init__(self, dim_in, dim_out):
-        super(ShidoTreeLSTM, self).__init__()
+        super(ShidoTreeLSTMLayer, self).__init__()
+        self.dim_in = dim_in
+        self.dim_out = dim_out
+        self.U_f = BiLSTM(dim_out, return_seq=True)
+        self.U_i = BiLSTM(dim_out)
+        self.U_u = BiLSTM(dim_out)
+        self.U_o = BiLSTM(dim_out)
+        self.W = tf.keras.layers.Dense(dim_out * 4)
+        # self.h_init = tfe.Variable(
+        #     tf.get_variable("h_init", [1, dim_out], tf.float32, initializer=he_normal()))
+        # self.c_init = tfe.Variable(
+        #     tf.get_variable("c_init", [1, dim_out], tf.float32, initializer=he_normal()))
+        self.h_init = tf.zeros([1, dim_out], tf.float32)
+        self.c_init = tf.zeros([1, dim_out], tf.float32)
+
+    def call(self, tensor, indices):
+        h_tensor = self.h_init
+        c_tensor = self.c_init
+        res_h, res_c = [], []
+        for indice, x in zip(indices, tensor):
+            h_tensor, c_tensor = self.apply(x, h_tensor, c_tensor, indice)
+            h_tensor = tf.concat([self.h_init, h_tensor], 0)
+            c_tensor = tf.concat([self.c_init, c_tensor], 0)
+            res_h.append(h_tensor[1:, :])
+            res_c.append(c_tensor[1:, :])
+        return res_h, res_c
+
+    def apply(self, x, h_tensor, c_tensor, indice):
+
+        mask_bool = tf.not_equal(indice, -1.)
+        mask = tf.cast(mask_bool, tf.float32)  # [nodes, child]
+        length = tf.cast(tf.reduce_sum(mask, 1), tf.int32)
+
+        h = tf.gather(h_tensor, tf.where(mask_bool,
+                                         indice, tf.zeros_like(indice)))  # [nodes, child, dim]
+        c = tf.gather(c_tensor, tf.where(mask_bool,
+                                         indice, tf.zeros_like(indice)))
+
+        W_x = self.W(x)  # [nodes, dim_out * 4]
+        W_f_x = W_x[:, :self.dim_out * 1]  # [nodes, dim_out]
+        W_i_x = W_x[:, self.dim_out * 1:self.dim_out * 2]
+        W_u_x = W_x[:, self.dim_out * 2:self.dim_out * 3]
+        W_o_x = W_x[:, self.dim_out * 3:]
+
+        branch_f_k = self.U_f(h, length)
+        branch_f_k = tf.sigmoid(tf.expand_dims(W_f_x, 1) + branch_f_k)
+        branch_f = tf.reduce_sum(branch_f_k * c * tf.expand_dims(mask, -1), 1)  # [node, dim_out]
+
+        branch_i = self.U_i(h, length)  # [nodes, dim_out]
+        branch_i = tf.sigmoid(branch_i + W_i_x)   # [nodes, dim_out]
+        branch_u = self.U_u(h, length)  # [nodes, dim_out]
+        branch_u = tf.tanh(branch_u + W_u_x)
+        branch_o = self.U_o(h, length)  # [nodes, dim_out]
+        branch_o = tf.sigmoid(branch_o + W_o_x)
+
+        new_c = branch_i * branch_u + branch_f  # [node, dim_out]
+        new_h = branch_o * tf.tanh(new_c)  # [node, dim_out]
+
+        return new_h, new_c
+
+
+class ShidoTreeLSTMLayerTreeBase(tf.keras.Model):
+    def __init__(self, dim_in, dim_out):
+        super(ShidoTreeLSTMLayerTreeBase, self).__init__()
         self.dim_in = dim_in
         self.dim_out = dim_out
         self.U_f = BiLSTM(dim_out, return_seq=True)
@@ -365,7 +428,7 @@ class ShidoTreeLSTM(tf.keras.Model):
         return new_h, new_c
 
 
-class ShidoTreeLSTMWithEmbedding(ShidoTreeLSTM):
+class ShidoTreeLSTMWithEmbedding(ShidoTreeLSTMLayer):
     def __init__(self, in_vocab, dim_in, dim_out):
         super(ShidoTreeLSTMWithEmbedding, self).__init__(dim_in, dim_out)
         self.E = tf.get_variable("E", [in_vocab, dim_in], tf.float32,
