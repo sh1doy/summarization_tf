@@ -260,12 +260,12 @@ class BiLSTM(tf.keras.Model):
         #                                              initializer=he_normal()))
         # self.h_init_b = tfe.Variable(tf.get_variable("h_init_b", [1, dim], tf.float32,
         #                                              initializer=he_normal()))
-        self.c_init_f = tfe.Variable(tf.random_normal([1, dim], stddev=0.01, dtype=tf.float32))
-        self.h_init_f = tfe.Variable(tf.random_normal([1, dim], stddev=0.01, dtype=tf.float32))
-        self.c_init_b = tfe.Variable(tf.random_normal([1, dim], stddev=0.01, dtype=tf.float32))
-        self.h_init_b = tfe.Variable(tf.random_normal([1, dim], stddev=0.01, dtype=tf.float32))
-        self.Cell_f = tf.contrib.cudnn_rnn.CudnnCompatibleLSTMCell(dim)
-        self.Cell_b = tf.contrib.cudnn_rnn.CudnnCompatibleLSTMCell(dim)
+        self.c_init_f = tfe.Variable(tf.random_normal([1, dim], stddev=0.001, dtype=tf.float32))
+        self.h_init_f = tfe.Variable(tf.random_normal([1, dim], stddev=0.001, dtype=tf.float32))
+        self.c_init_b = tfe.Variable(tf.random_normal([1, dim], stddev=0.001, dtype=tf.float32))
+        self.h_init_b = tfe.Variable(tf.random_normal([1, dim], stddev=0.001, dtype=tf.float32))
+        self.Cell_f = tf.contrib.rnn.LSTMBlockCell(dim)
+        self.Cell_b = tf.contrib.rnn.LSTMBlockCell(dim)
         self.fc = tf.keras.layers.Dense(dim, use_bias=False)
         self.return_seq = return_seq
 
