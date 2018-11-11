@@ -159,8 +159,8 @@ class BaseModel(tf.keras.Model):
     def translate(self, x, nl_i2w, nl_w2i, max_length=100):
         res = []
         y_enc, (c, h) = self.encode(x)
-        tensor, indice, tree_num = x
-        for i in range(len(tensor) if type(tensor) is list else tensor.shape[0]):
+        batch_size = len(y_enc)
+        for i in range(batch_size):
             nl, _ = self.decoder.translate(
                 y_enc[i], (c[i], h[i]), max_length, nl_w2i["<s>"], nl_w2i["</s>"])
             res.append([nl_i2w[n] for n in nl])
