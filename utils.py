@@ -195,6 +195,10 @@ def he_normal():
     return tf.keras.initializers.he_normal()
 
 
+def orthogonal():
+    return tf.orthogonal_initializer()
+
+
 def get_sequence_mask(xs):
     x_len = tf.constant([x.shape[0] for x in xs], tf.int32)
     mask = tf.tile(tf.reshape(tf.range(0, tf.reduce_max(x_len),
