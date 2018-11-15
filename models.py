@@ -10,15 +10,12 @@ class AttentionDecoder(tf.keras.Model):
         self.layer = layer
         self.dim_rep = dim_rep
         self.F = tf.keras.layers.Embedding(vocab_size, dim_F)
-        self.gru = tf.keras.layers.CuDNNLSTM(dim_rep,
-                                             return_sequences=True,
-                                             return_state=True,
-                                             recurrent_initializer='glorot_uniform')
-        if layer > 1:
-            self.gru2 = tf.keras.layers.CuDNNLSTM(dim_rep,
-                                                  return_sequences=True,
-                                                  return_state=True,
-                                                  recurrent_initializer='glorot_uniform')
+        for i in range(layer):
+            self.__setattr__("layer{}".format(i),
+                             tf.keras.layers.CuDNNLSTM(dim_rep,
+                                                       return_sequences=True,
+                                                       return_state=True,
+                                                       recurrent_initializer='glorot_uniform'))
         self.fc = tf.keras.layers.Dense(vocab_size)
 
         # used for attention
@@ -43,12 +40,15 @@ class AttentionDecoder(tf.keras.Model):
         enc_y = tf.nn.dropout(enc_y, 1. - dropout)
         dec_hidden = tf.nn.dropout(h, 1. - dropout)
         dec_cell = tf.nn.dropout(c, 1. - dropout)
+
+        l_states = [(dec_hidden, dec_cell) for _ in range(self.layer)]
+        target = tf.nn.relu(target)
         dec_input = target[:, 0]
         loss = 0
         for t in range(1, target.shape[1]):
             # passing enc_output to the decoder
-            predictions, dec_hidden, dec_cell, att = self.call(
-                dec_input, dec_hidden, dec_cell, enc_y)
+            predictions, l_states, att = self.call(
+                dec_input, l_states, enc_y)
             real = tf.boolean_mask(target[:, t], mask[:, t])
             pred = tf.boolean_mask(predictions, mask[:, t])
             loss += self.loss_function(real, pred)
@@ -71,9 +71,11 @@ class AttentionDecoder(tf.keras.Model):
         dec_input = tf.constant(start_token, tf.int32, [1])
         result = []
 
+        l_states = [(dec_hidden, dec_cell) for _ in range(self.layer)]
+
         for t in range(max_length):
-            predictions, dec_hidden, dec_cell, attention_weights = self.call(
-                dec_input, dec_hidden, dec_cell, y_enc)
+            predictions, l_states, attention_weights = self.call(
+                dec_input, l_states, y_enc)
 
             attention_weights = tf.reshape(attention_weights, (-1,))
             attention_plot[t] = attention_weights.numpy()
@@ -89,13 +91,13 @@ class AttentionDecoder(tf.keras.Model):
 
         return result, attention_plot
 
-    def call(self, x, hidden, cell, enc_y):
+    def call(self, x, l_states, enc_y):
         # enc_y shape == (batch_size, max_length, hidden_size)
 
         # hidden shape == (batch_size, hidden size)
         # hidden_with_time_axis shape == (batch_size, 1, hidden size)
         # we are doing this to perform addition to calculate the score
-        hidden_with_time_axis = tf.expand_dims(hidden, 1)
+        hidden_with_time_axis = tf.expand_dims(l_states[-1][0], 1)
 
         # score shape == (batch_size, max_length, hidden_size)
         score = tf.nn.tanh(self.W1(enc_y) + self.W2(hidden_with_time_axis))
@@ -109,23 +111,26 @@ class AttentionDecoder(tf.keras.Model):
         context_vector = tf.reduce_sum(context_vector, axis=1)
 
         # x shape after passing through embedding == (batch_size, 1, embedding_dim)
-        x = tf.expand_dims(self.F(x), 1)
+        x = tf.expand_dims(x, 1)
+        x = self.F(x)
 
         # x shape after concatenation == (batch_size, 1, embedding_dim + hidden_size)
         x = tf.concat([tf.expand_dims(context_vector, 1), x], axis=-1)
 
         # passing the concatenated vector to the GRU
-        output, state, cell = self.gru(x, (hidden, cell))
-        if self.layer > 1:
-            output, state, cell = self.gru2(output, (hidden, cell))
+        new_l_states = []
+        for i, states in zip(range(self.layer), l_states):
+            x, h, c = getattr(self, "layer{}".format(i))(x, states)
+            n_states = (h, c)
+            new_l_states.append(n_states)
 
         # output shape == (batch_size * 1, hidden_size)
-        output = tf.reshape(output, (-1, output.shape[2]))
+        x = tf.reshape(x, (-1, x.shape[2]))
 
         # output shape == (batch_size * 1, vocab)
-        x = self.fc(output)
+        x = self.fc(x)
 
-        return x, state, cell, attention_weights
+        return x, new_l_states, attention_weights
 
 
 class BaseModel(tf.keras.Model):
