@@ -205,6 +205,7 @@ class Seq2seqModel(BaseModel):
 
     def encode(self, seq):
         length = get_length(seq)
+        seq = tf.nn.relu(seq)
         seq = self.E(seq)
         ys, states = self.encoder(seq, length)
         if self.layer > 1:
