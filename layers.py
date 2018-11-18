@@ -248,6 +248,72 @@ class ChildSumLSTMLayerTreeBase(tf.keras.Model):
         return new_h, new_c
 
 
+class NaryLSTMLayer(tf.keras.Model):
+    def __init__(self, dim_in, dim_out):
+        super(NaryLSTMLayer, self).__init__()
+        self.dim_in = dim_in
+        self.dim_out = dim_out
+        self.U_f1 = tf.keras.layers.Dense(dim_out, use_bias=False)
+        self.U_f2 = tf.keras.layers.Dense(dim_out, use_bias=False)
+        self.U_iuo = tf.keras.layers.Dense(dim_out * 3, use_bias=False)
+        self.W = tf.keras.layers.Dense(dim_out * 4)
+        # self.h_init = tfe.Variable(
+        #     tf.get_variable("h_init", [1, dim_out], tf.float32, initializer=he_normal()))
+        # self.c_init = tfe.Variable(
+        #     tf.get_variable("h_init", [1, dim_out], tf.float32, initializer=he_normal()))
+        self.h_init = tf.zeros([1, dim_out], tf.float32)
+        self.c_init = tf.zeros([1, dim_out], tf.float32)
+
+    def call(self, tensor, indices):
+        h_tensor = self.h_init
+        c_tensor = self.c_init
+        res_h, res_c = [], []
+        for indice, x in zip(indices, tensor):
+            h_tensor, c_tensor = self.apply(x, h_tensor, c_tensor, indice)
+            h_tensor = tf.concat([self.h_init, h_tensor], 0)
+            c_tensor = tf.concat([self.c_init, c_tensor], 0)
+            res_h.append(h_tensor[1:, :])
+            res_c.append(c_tensor[1:, :])
+        return res_h, res_c
+
+    def apply(self, x, h_tensor, c_tensor, indice):
+
+        mask_bool = tf.not_equal(indice, -1.)
+
+        h = tf.gather(h_tensor, tf.where(mask_bool,
+                                         indice, tf.zeros_like(indice)))  # [nodes, child, dim]
+        c = tf.gather(c_tensor, tf.where(mask_bool,
+                                         indice, tf.zeros_like(indice)))
+
+        W_x = self.W(x)  # [nodes, dim_out * 4]
+        W_f_x = W_x[:, :self.dim_out * 1]  # [nodes, dim_out]
+        W_i_x = W_x[:, self.dim_out * 1:self.dim_out * 2]
+        W_u_x = W_x[:, self.dim_out * 2:self.dim_out * 3]
+        W_o_x = W_x[:, self.dim_out * 3:]
+
+        if h.shape[1] <= 1:
+            h = tf.concat([h, tf.zeros_like(h)], 1)  # [nodes, 2, dim]
+            c = tf.concat([c, tf.zeros_like(c)], 1)
+
+        h_concat = tf.reshape(h, [h.shape[0], -1])
+
+        branch_f1 = self.U_f1(h_concat)
+        branch_f1 = tf.sigmoid(W_f_x + branch_f1)
+        branch_f2 = self.U_f2(h_concat)
+        branch_f2 = tf.sigmoid(W_f_x + branch_f2)
+        branch_f = branch_f1 * c[:, 0] + branch_f2 * c[:, 1]
+
+        branch_iuo = self.U_iuo(h_concat)  # [nodes, dim_out * 3]
+        branch_i = tf.sigmoid(branch_iuo[:, :self.dim_out * 1] + W_i_x)   # [nodes, dim_out]
+        branch_u = tf.tanh(branch_iuo[:, self.dim_out * 1:self.dim_out * 2] + W_u_x)
+        branch_o = tf.sigmoid(branch_iuo[:, self.dim_out * 2:] + W_o_x)
+
+        new_c = branch_i * branch_u + branch_f  # [node, dim_out]
+        new_h = branch_o * tf.tanh(new_c)  # [node, dim_out]
+
+        return new_h, new_c
+
+
 class BiLSTM(tf.keras.Model):
     def __init__(self, dim, return_seq=False):
         super(BiLSTM, self).__init__()

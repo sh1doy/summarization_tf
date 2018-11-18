@@ -1,6 +1,6 @@
 import argparse
-from utils import read_pickle, Datagen_set, Datagen_deepcom, Datagen_tree, bleu4
-from models import Seq2seqModel, CodennModel, ChildsumModel, MultiwayModel
+from utils import read_pickle, Datagen_set, Datagen_deepcom, Datagen_tree, Datagen_binary, bleu4
+from models import Seq2seqModel, CodennModel, ChildsumModel, MultiwayModel, NaryModel
 import numpy as np
 import os
 import tensorflow as tf
@@ -14,7 +14,7 @@ import json
 parser = argparse.ArgumentParser(description='Source Code Generation')
 
 parser.add_argument('-m', "--method", type=str, nargs="?", required=True,
-                    choices=['seq2seq', 'deepcom', 'codenn', 'childsum', 'multiway'],
+                    choices=['seq2seq', 'deepcom', 'codenn', 'childsum', 'multiway', "nary"],
                     help='Encoder method')
 parser.add_argument('-d', "--dim", type=int, nargs="?", required=False, default=512,
                     help='Representation dimension')
@@ -87,6 +87,9 @@ elif args.method in ['childsum']:
     Model = ChildsumModel
 elif args.method in ['multiway']:
     Model = MultiwayModel
+elif args.method in ['nary']:
+    Model = NaryModel
+
 
 model = Model(args.dim, args.dim, args.dim, len(code_w2i), len(nl_w2i),
               dropout=0.5, lr=args.lr, layer=args.layer)
@@ -106,6 +109,9 @@ elif args.method in ['codenn']:
     Datagen = Datagen_set
 elif args.method in ['childsum', 'multiway']:
     Datagen = Datagen_tree
+elif args.method in ['nary']:
+    Datagen = Datagen_binary
+
 
 trn_gen = Datagen(trn_x, trn_y, batch_size, code_w2i, nl_i2w, train=True)
 vld_gen = Datagen(vld_x, vld_y, batch_size, code_w2i, nl_i2w, train=False)
