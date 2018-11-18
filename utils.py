@@ -16,6 +16,20 @@ def get_nums(roots):
     return tf.constant(res, tf.int32)
 
 
+def tree2binary(trees):
+    def helper(root):
+        if len(root.children) > 2:
+            tmp = root.children[0]
+            for child in root.children[1:]:
+                tmp.children += [child]
+                tmp = child
+            root.children = root.children[0:1]
+        for child in root.children:
+            helper(child)
+        return root
+    return [helper(x) for x in trees]
+
+
 def tree2tensor(trees):
     '''
     indice:
@@ -264,13 +278,14 @@ def bleu4(true, pred):
 
 
 class Datagen_tree:
-    def __init__(self, X, Y, batch_size, code_dic, nl_dic, train=True):
+    def __init__(self, X, Y, batch_size, code_dic, nl_dic, train=True, binary=False):
         self.X = X
         self.Y = Y
         self.batch_size = batch_size
         self.code_dic = code_dic
         self.nl_dic = nl_dic
         self.train = train
+        self.binary = binary
 
     def __len__(self):
         return len(range(0, len(self.X), self.batch_size))
@@ -291,6 +306,8 @@ class Datagen_tree:
             x = X[i:i + self.batch_size]
             y = Y[i:i + self.batch_size]
             x_raw = [read_pickle(n) for n in x]
+            if self.binary:
+                x_raw = tree2binary(x_raw)
             y_raw = [[self.nl_dic[t] for t in s] for s in y]
             x = [consult_tree(n, self.code_dic) for n in x_raw]
             x_raw = [traverse_label(n) for n in x_raw]
@@ -300,6 +317,12 @@ class Datagen_tree:
                     min(max([len(s) for s in y]), 100),
                     padding="post", truncating="post", value=-1.))
             yield tree2tensor(x), y, x_raw, y_raw
+
+
+class Datagen_binary(Datagen_tree):
+    def __init__(self, X, Y, batch_size, code_dic, nl_dic, train=True, binary=True):
+        super(Datagen_binary, self).__init__(X, Y, batch_size, code_dic,
+                                             nl_dic, train=True, binary=True)
 
 
 class Datagen_set:
