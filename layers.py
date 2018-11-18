@@ -9,7 +9,7 @@ class TreeEmbeddingLayer(tf.keras.Model):
     def __init__(self, dim_E, in_vocab):
         super(TreeEmbeddingLayer, self).__init__()
         self.E = tf.get_variable("E", [in_vocab, dim_E], tf.float32,
-                                 initializer=he_normal())
+                                 initializer=tf.keras.initializers.RandomUniform())
 
     def call(self, x):
         '''x: list of [1,]'''
@@ -23,7 +23,7 @@ class TreeEmbeddingLayerTreeBase(tf.keras.Model):
     def __init__(self, dim_E, in_vocab):
         super(TreeEmbeddingLayerTreeBase, self).__init__()
         self.E = tf.get_variable("E", [in_vocab, dim_E], tf.float32,
-                                 initializer=he_normal())
+                                 initializer=tf.keras.initializers.RandomUniform())
 
     def call(self, roots):
         return [self.apply_single(root) for root in roots]
@@ -47,7 +47,7 @@ class ChildSumLSTMLayerWithEmbedding(tf.keras.Model):
         self.dim_in = dim_in
         self.dim_out = dim_out
         self.E = tf.get_variable("E", [in_vocab, dim_in], tf.float32,
-                                 initializer=he_normal())
+                                 initializer=tf.keras.initializers.RandomUniform())
         self.U_f = tf.keras.layers.Dense(dim_out, use_bias=False)
         self.U_iuo = tf.keras.layers.Dense(dim_out * 3, use_bias=False)
         self.W = tf.keras.layers.Dense(dim_out * 4)
@@ -432,7 +432,7 @@ class ShidoTreeLSTMWithEmbedding(ShidoTreeLSTMLayer):
     def __init__(self, in_vocab, dim_in, dim_out):
         super(ShidoTreeLSTMWithEmbedding, self).__init__(dim_in, dim_out)
         self.E = tf.get_variable("E", [in_vocab, dim_in], tf.float32,
-                                 initializer=he_normal())
+                                 initializer=tf.keras.initializers.RandomUniform())
         self.dim_in = dim_in
         self.dim_out = dim_out
         self.U_f = BiLSTM(dim_out, return_seq=True)
@@ -481,7 +481,7 @@ class SetEmbeddingLayer(tf.keras.Model):
     def __init__(self, dim_E, in_vocab):
         super(SetEmbeddingLayer, self).__init__()
         self.E = tf.get_variable("E", [in_vocab, dim_E], tf.float32,
-                                 initializer=he_normal())
+                                 initializer=tf.keras.initializers.RandomUniform())
 
     def call(self, sets):
         length = [len(s) for s in sets]
