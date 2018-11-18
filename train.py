@@ -51,6 +51,7 @@ tfe = tf.contrib.eager
 config = tf.ConfigProto(
     gpu_options=tf.GPUOptions(
         visible_device_list=args.gpu))
+config.gpu_options.allow_growth = True
 session = tf.Session(config=config)
 tf.enable_eager_execution(config=config)
 os.makedirs("./logs/" + name, exist_ok=True)
