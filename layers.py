@@ -377,10 +377,10 @@ class ShidoTreeLSTMLayer(tf.keras.Model):
         res_h, res_c = [], []
         for indice, x in zip(indices, tensor):
             h_tensor, c_tensor = self.apply(x, h_tensor, c_tensor, indice)
+            res_h.append(h_tensor[:, :])
+            res_c.append(c_tensor[:, :])
             h_tensor = tf.concat([self.h_init, h_tensor], 0)
             c_tensor = tf.concat([self.c_init, c_tensor], 0)
-            res_h.append(h_tensor[1:, :])
-            res_c.append(c_tensor[1:, :])
         return res_h, res_c
 
     def apply(self, x, h_tensor, c_tensor, indice):
