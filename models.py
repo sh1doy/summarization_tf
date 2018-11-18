@@ -181,7 +181,7 @@ class CodennModel(BaseModel):
     def __init__(self, dim_E, dim_F, dim_rep, in_vocab, out_vocab, layer=1, dropout=0.5, lr=1e-3):
         super(CodennModel, self).__init__(dim_E, dim_F, dim_rep, in_vocab,
                                           out_vocab, layer, dropout, lr)
-        self.E = SetEmbeddingLayer(dim_E, in_vocab)
+        self.E = SetEmbeddingLayer(in_vocab, dim_E)
 
     def encode(self, sets):
         sets = self.E(sets)
@@ -198,7 +198,7 @@ class Seq2seqModel(BaseModel):
         super(Seq2seqModel, self).__init__(dim_E, dim_F,
                                            dim_rep, in_vocab, out_vocab, layer, dropout, lr)
         self.layer = layer
-        self.E = SequenceEmbeddingLayer(dim_E, in_vocab)
+        self.E = SequenceEmbeddingLayer(in_vocab, in_vocab)
         self.encoder = LSTMEncoder(dim_E, dim_rep)
         if self.layer > 1:
             self.additive = LSTMEncoder(dim_rep, dim_rep)
@@ -223,7 +223,7 @@ class ChildsumModel(BaseModel):
         super(ChildsumModel, self).__init__(dim_E, dim_F,
                                             dim_rep, in_vocab, out_vocab, layer, dropout, lr)
         self.layer = layer
-        self.E = TreeEmbeddingLayer(in_vocab, dim_E)
+        self.E = TreeEmbeddingLayer(dim_E, in_vocab)
         for i in range(layer):
             self.__setattr__("layer{}".format(i), ChildSumLSTMLayer(dim_E, dim_rep))
 
@@ -249,7 +249,7 @@ class NaryModel(BaseModel):
         super(NaryModel, self).__init__(dim_E, dim_F,
                                         dim_rep, in_vocab, out_vocab, layer, dropout, lr)
         self.layer = layer
-        self.E = TreeEmbeddingLayer(in_vocab, dim_E)
+        self.E = TreeEmbeddingLayer(dim_E, in_vocab)
         for i in range(layer):
             self.__setattr__("layer{}".format(i), NaryLSTMLayer(dim_E, dim_rep))
 
@@ -275,7 +275,7 @@ class MultiwayModel(BaseModel):
         super(MultiwayModel, self).__init__(dim_E, dim_F,
                                             dim_rep, in_vocab, out_vocab, layer, dropout, lr)
         self.layer = layer
-        self.E = TreeEmbeddingLayer(in_vocab, dim_E)
+        self.E = TreeEmbeddingLayer(dim_E, in_vocab)
         for i in range(layer):
             self.__setattr__("layer{}".format(i), ShidoTreeLSTMLayer(dim_E, dim_rep))
 
