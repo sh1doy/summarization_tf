@@ -142,7 +142,7 @@ class BaseModel(tf.keras.Model):
         self.in_vocab = in_vocab
         self.out_vocab = out_vocab
         self.dropout = dropout
-        self.decoder = AttentionDecoder(dim_F, dim_rep, out_vocab, 1)
+        self.decoder = AttentionDecoder(dim_F, dim_rep, out_vocab, layer)
         self.optimizer = tf.train.AdamOptimizer(lr)
 
     def encode(self, trees):
