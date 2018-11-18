@@ -181,7 +181,7 @@ class CodennModel(BaseModel):
     def __init__(self, dim_E, dim_F, dim_rep, in_vocab, out_vocab, layer=1, dropout=0.5, lr=1e-3):
         super(CodennModel, self).__init__(dim_E, dim_F, dim_rep, in_vocab,
                                           out_vocab, layer, dropout, lr)
-        self.E = SetEmbeddingLayer(dim_E, in_vocab)
+        self.E = SetEmbeddingLayer(in_vocab, dim_E)
 
     def encode(self, sets):
         sets = self.E(sets)
