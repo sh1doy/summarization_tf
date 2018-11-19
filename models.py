@@ -198,22 +198,23 @@ class Seq2seqModel(BaseModel):
         super(Seq2seqModel, self).__init__(dim_E, dim_F,
                                            dim_rep, in_vocab, out_vocab, layer, dropout, lr)
         self.layer = layer
-        self.E = SequenceEmbeddingLayer(dim_E, in_vocab)
-        self.encoder = LSTMEncoder(dim_E, dim_rep)
-        if self.layer > 1:
-            self.additive = LSTMEncoder(dim_rep, dim_rep)
+        self.E = tf.keras.layers.Embedding(in_vocab + 1, dim_E, mask_zero=True)
+        for i in range(layer):
+            self.__setattr__("layer{}".format(i),
+                             tf.keras.layers.Bidirectional(
+                tf.keras.layers.CuDNNLSTM(dim_rep,
+                                          return_sequences=True,
+                                          return_state=True)))
 
     def encode(self, seq):
         length = get_length(seq)
-        seq = tf.nn.relu(seq)
-        seq = self.E(seq)
-        ys, states = self.encoder(seq, length)
-        if self.layer > 1:
-            ys, states = self.additive(ys, length)
+        tensor = self.E(seq + 1)
+        for i in range(self.layer):
+            tensor, h1, c1, h2, c2 = getattr(self, "layer{}".format(i))(tensor)
 
-        cx = states.c
-        hx = states.h
-        ys = [y[:i] for y, i in zip(tf.unstack(ys, axis=0), length.numpy())]
+        cx = c1 + c2
+        hx = h1 + h2
+        ys = [y[:i] for y, i in zip(tf.unstack(tensor, axis=0), length.numpy())]
 
         return ys, [hx, cx]
 
