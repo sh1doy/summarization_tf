@@ -314,9 +314,9 @@ class NaryLSTMLayer(tf.keras.Model):
         return new_h, new_c
 
 
-class BiLSTM(tf.keras.Model):
+class BiLSTM_(tf.keras.Model):
     def __init__(self, dim, return_seq=False):
-        super(BiLSTM, self).__init__()
+        super(BiLSTM_, self).__init__()
         self.dim = dim
         # self.c_init_f = tfe.Variable(tf.get_variable("c_init_f", [1, dim], tf.float32,
         #                                              initializer=he_normal()))
@@ -352,6 +352,39 @@ class BiLSTM(tf.keras.Model):
             state_f, state_b = states
             state_concat = tf.concat([state_f.h, state_b.h], -1)
             return self.fc(state_concat)
+
+
+class BiLSTM(tf.keras.Model):
+    def __init__(self, dim, return_seq=False):
+        super(BiLSTM, self).__init__()
+        self.dim = dim
+        self.c_init_f = tfe.Variable(tf.random_normal([1, dim], stddev=0.01, dtype=tf.float32))
+        self.h_init_f = tfe.Variable(tf.random_normal([1, dim], stddev=0.01, dtype=tf.float32))
+        self.c_init_b = tfe.Variable(tf.random_normal([1, dim], stddev=0.01, dtype=tf.float32))
+        self.h_init_b = tfe.Variable(tf.random_normal([1, dim], stddev=0.01, dtype=tf.float32))
+        self.lay_f = tf.keras.layers.CuDNNLSTM(dim, return_sequences=True, return_state=True)
+        self.lay_b = tf.keras.layers.CuDNNLSTM(dim, return_sequences=True, return_state=True)
+        self.fc = tf.keras.layers.Dense(dim, use_bias=False)
+        self.return_seq = return_seq
+
+    def call(self, x, length):
+        '''x: [batch, length, dim]'''
+        batch = x.shape[0]
+        x_back = tf.reverse_sequence(x, length, 1)
+
+        init_state_f = (tf.tile(self.h_init_f, [batch, 1]), tf.tile(self.c_init_f, [batch, 1]))
+        init_state_b = (tf.tile(self.h_init_b, [batch, 1]), tf.tile(self.c_init_b, [batch, 1]))
+
+        y_f, h_f, c_f = self.lay_f(x, init_state_f)
+        y_b, h_b, c_b = self.lay_b(x_back, init_state_b)
+
+        y = tf.concat([y_f, y_b], -1)
+
+        if self.return_seq:
+            return self.fc(y)
+        else:
+            y_last = tf.gather_nd(y, tf.stack([tf.range(batch), length - 1], 1))
+            return self.fc(y_last)
 
 
 class ShidoTreeLSTMLayer(tf.keras.Model):
