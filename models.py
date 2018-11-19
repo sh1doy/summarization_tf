@@ -22,6 +22,7 @@ class AttentionDecoder(tf.keras.Model):
         self.W1 = tf.keras.layers.Dense(self.dim_rep)
         self.W2 = tf.keras.layers.Dense(self.dim_rep)
         self.V = tf.keras.layers.Dense(1)
+        print("I am Decoder, dim is {} and {} layers".format(str(self.dim_rep), str(self.layer)))
 
     @staticmethod
     def loss_function(real, pred):
@@ -184,6 +185,8 @@ class CodennModel(BaseModel):
                                           out_vocab, layer, dropout, lr)
         self.dropout = dropout
         self.E = SetEmbeddingLayer(dim_E, in_vocab)
+        print("I am CodeNNModel, dim is {} and {} layers".format(
+            str(self.dim_rep), str(self.layer)))
 
     def encode(self, sets):
         sets = self.E(sets)
@@ -208,6 +211,8 @@ class Seq2seqModel(BaseModel):
                              tf.keras.layers.CuDNNLSTM(dim_rep,
                                                        return_sequences=True,
                                                        return_state=True))
+        print("I am seq2seq model, dim is {} and {} layers".format(
+            str(self.dim_rep), str(self.layer)))
 
     def encode(self, seq):
         length = get_length(seq)
@@ -234,6 +239,8 @@ class ChildsumModel(BaseModel):
         self.E = TreeEmbeddingLayer(dim_E, in_vocab)
         for i in range(layer):
             self.__setattr__("layer{}".format(i), ChildSumLSTMLayer(dim_E, dim_rep))
+        print("I am Child-sum model, dim is {} and {} layers".format(
+            str(self.dim_rep), str(self.layer)))
 
     def encode(self, x):
         tensor, indice, tree_num = x
@@ -264,6 +271,8 @@ class NaryModel(BaseModel):
         self.E = TreeEmbeddingLayer(dim_E, in_vocab)
         for i in range(layer):
             self.__setattr__("layer{}".format(i), NaryLSTMLayer(dim_E, dim_rep))
+        print("I am N-ary model, dim is {} and {} layers".format(
+            str(self.dim_rep), str(self.layer)))
 
     def encode(self, x):
         tensor, indice, tree_num = x
@@ -294,6 +303,8 @@ class MultiwayModel(BaseModel):
         self.E = TreeEmbeddingLayer(dim_E, in_vocab)
         for i in range(layer):
             self.__setattr__("layer{}".format(i), ShidoTreeLSTMLayer(dim_E, dim_rep))
+        print("I am Multi-way model, dim is {} and {} layers".format(
+            str(self.dim_rep), str(self.layer)))
 
     def encode(self, x):
         tensor, indice, tree_num = x
