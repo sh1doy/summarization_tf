@@ -186,7 +186,7 @@ class CodennModel(BaseModel):
         self.dropout = dropout
         self.E = SetEmbeddingLayer(dim_E, in_vocab)
         print("I am CodeNNModel, dim is {} and {} layered".format(
-            str(self.dim_rep), str(self.layer)))
+            str(self.dim_rep), "0"))
 
     def encode(self, sets):
         sets = self.E(sets)
