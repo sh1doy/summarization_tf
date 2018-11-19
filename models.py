@@ -205,10 +205,9 @@ class Seq2seqModel(BaseModel):
         self.E = tf.keras.layers.Embedding(in_vocab + 1, dim_E, mask_zero=True)
         for i in range(layer):
             self.__setattr__("layer{}".format(i),
-                             tf.keras.layers.Bidirectional(
-                tf.keras.layers.CuDNNLSTM(dim_rep,
-                                          return_sequences=True,
-                                          return_state=True)))
+                             tf.keras.layers.CuDNNLSTM(dim_rep,
+                                                       return_sequences=True,
+                                                       return_state=True))
 
     def encode(self, seq):
         length = get_length(seq)
