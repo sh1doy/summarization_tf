@@ -120,7 +120,9 @@ class AttentionDecoder(tf.keras.Model):
         # passing the concatenated vector to the GRU
         new_l_states = []
         for i, states in zip(range(self.layer), l_states):
+            skip = x[:, :, :self.dim_rep]
             x, h, c = getattr(self, "layer{}".format(i))(x, states)
+            x += skip
             n_states = (h, c)
             new_l_states.append(n_states)
 
@@ -210,7 +212,9 @@ class Seq2seqModel(BaseModel):
         length = get_length(seq)
         tensor = self.E(seq + 1)
         for i in range(self.layer):
+            skip = tensor
             tensor, h1, c1, h2, c2 = getattr(self, "layer{}".format(i))(tensor)
+            tensor += skip
 
         cx = c1 + c2
         hx = h1 + h2
@@ -232,7 +236,9 @@ class ChildsumModel(BaseModel):
         tensor, indice, tree_num = x
         tensor = self.E(tensor)
         for i in range(self.layer):
+            skip = tensorr
             tensor, c = getattr(self, "layer{}".format(i))(tensor, indice)
+            tensor += skip
 
         hx = tensor[-1]
         cx = c[-1]
@@ -258,7 +264,9 @@ class NaryModel(BaseModel):
         tensor, indice, tree_num = x
         tensor = self.E(tensor)
         for i in range(self.layer):
+            skip = tensor
             tensor, c = getattr(self, "layer{}".format(i))(tensor, indice)
+            tensor += skip
 
         hx = tensor[-1]
         cx = c[-1]
@@ -284,7 +292,9 @@ class MultiwayModel(BaseModel):
         tensor, indice, tree_num = x
         tensor = self.E(tensor)
         for i in range(self.layer):
+            skip = tensor
             tensor, c = getattr(self, "layer{}".format(i))(tensor, indice)
+            tensor += skip
 
         hx = tensor[-1]
         cx = c[-1]
