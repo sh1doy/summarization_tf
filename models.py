@@ -37,9 +37,8 @@ class AttentionDecoder(tf.keras.Model):
         mask = tf.not_equal(target, -1.)
         h, c = states
         enc_y, _ = pad_tensor(enc_y)
-        enc_y = tf.nn.dropout(enc_y, 1. - dropout)
-        dec_hidden = tf.nn.dropout(h, 1. - dropout)
-        dec_cell = tf.nn.dropout(c, 1. - dropout)
+        dec_hidden = h
+        dec_cell = c
 
         l_states = [(dec_hidden, dec_cell) for _ in range(self.layer)]
         target = tf.nn.relu(target)
@@ -183,10 +182,12 @@ class CodennModel(BaseModel):
     def __init__(self, dim_E, dim_F, dim_rep, in_vocab, out_vocab, layer=1, dropout=0.5, lr=1e-3):
         super(CodennModel, self).__init__(dim_E, dim_F, dim_rep, in_vocab,
                                           out_vocab, layer, dropout, lr)
+        self.dropout = dropout
         self.E = SetEmbeddingLayer(dim_E, in_vocab)
 
     def encode(self, sets):
         sets = self.E(sets)
+        sets = tf.nn.dropout(sets, 1. - self.dropout)
 
         hx = tf.zeros([len(sets), self.dim_rep])
         cx = tf.zeros([len(sets), self.dim_rep])
@@ -200,6 +201,7 @@ class Seq2seqModel(BaseModel):
         super(Seq2seqModel, self).__init__(dim_E, dim_F,
                                            dim_rep, in_vocab, out_vocab, layer, dropout, lr)
         self.layer = layer
+        self.dropout = dropout
         self.E = tf.keras.layers.Embedding(in_vocab + 1, dim_E, mask_zero=True)
         for i in range(layer):
             self.__setattr__("layer{}".format(i),
@@ -211,6 +213,7 @@ class Seq2seqModel(BaseModel):
     def encode(self, seq):
         length = get_length(seq)
         tensor = self.E(seq + 1)
+        tensor = tf.nn.dropout(tensor, 1. - self.dropout)
         for i in range(self.layer):
             skip = tensor
             tensor, h1, c1, h2, c2 = getattr(self, "layer{}".format(i))(tensor)
@@ -228,6 +231,7 @@ class ChildsumModel(BaseModel):
         super(ChildsumModel, self).__init__(dim_E, dim_F,
                                             dim_rep, in_vocab, out_vocab, layer, dropout, lr)
         self.layer = layer
+        self.dropout = dropout
         self.E = TreeEmbeddingLayer(dim_E, in_vocab)
         for i in range(layer):
             self.__setattr__("layer{}".format(i), ChildSumLSTMLayer(dim_E, dim_rep))
@@ -235,6 +239,7 @@ class ChildsumModel(BaseModel):
     def encode(self, x):
         tensor, indice, tree_num = x
         tensor = self.E(tensor)
+        tensor = tf.nn.dropout(tensor, 1. - self.dropout)
         for i in range(self.layer):
             skip = tensorr
             tensor, c = getattr(self, "layer{}".format(i))(tensor, indice)
@@ -256,6 +261,7 @@ class NaryModel(BaseModel):
         super(NaryModel, self).__init__(dim_E, dim_F,
                                         dim_rep, in_vocab, out_vocab, layer, dropout, lr)
         self.layer = layer
+        self.dropout = dropout
         self.E = TreeEmbeddingLayer(dim_E, in_vocab)
         for i in range(layer):
             self.__setattr__("layer{}".format(i), NaryLSTMLayer(dim_E, dim_rep))
@@ -263,6 +269,7 @@ class NaryModel(BaseModel):
     def encode(self, x):
         tensor, indice, tree_num = x
         tensor = self.E(tensor)
+        tensor = tf.nn.dropout(tensor, 1. - self.dropout)
         for i in range(self.layer):
             skip = tensor
             tensor, c = getattr(self, "layer{}".format(i))(tensor, indice)
@@ -284,6 +291,7 @@ class MultiwayModel(BaseModel):
         super(MultiwayModel, self).__init__(dim_E, dim_F,
                                             dim_rep, in_vocab, out_vocab, layer, dropout, lr)
         self.layer = layer
+        self.dropout = dropout
         self.E = TreeEmbeddingLayer(dim_E, in_vocab)
         for i in range(layer):
             self.__setattr__("layer{}".format(i), ShidoTreeLSTMLayer(dim_E, dim_rep))
@@ -291,6 +299,7 @@ class MultiwayModel(BaseModel):
     def encode(self, x):
         tensor, indice, tree_num = x
         tensor = self.E(tensor)
+        tensor = tf.nn.dropout(tensor, 1. - self.dropout)
         for i in range(self.layer):
             skip = tensor
             tensor, c = getattr(self, "layer{}".format(i))(tensor, indice)
