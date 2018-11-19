@@ -156,15 +156,17 @@ with writer.as_default(), tf.contrib.summary.always_record_summaries():
         tf.contrib.summary.scalar("bleu_val", np.mean(bleus), step=epoch)
 
         # checkpoint
+        checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
+        hoge = root.save(file_prefix=checkpoint_prefix)
         if history["bleu_val"][-1] == max(history["bleu_val"]):
-            checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
-            root.save(file_prefix=checkpoint_prefix)
+            best_model = hoge
+            print("Now best model is {}".format(best_model))
 
 
 # load final weight
 
-root.restore(tf.train.latest_checkpoint(checkpoint_dir))
-
+print("Restore {}".format(best_model))
+root.restore(best_model)
 
 # evaluation
 

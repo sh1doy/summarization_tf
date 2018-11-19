@@ -187,7 +187,7 @@ class CodennModel(BaseModel):
 
     def encode(self, sets):
         sets = self.E(sets)
-        sets = tf.nn.dropout(sets, 1. - self.dropout)
+        sets = [tf.nn.dropout(t, 1. - self.dropout) for t in sets]
 
         hx = tf.zeros([len(sets), self.dim_rep])
         cx = tf.zeros([len(sets), self.dim_rep])
@@ -213,7 +213,7 @@ class Seq2seqModel(BaseModel):
     def encode(self, seq):
         length = get_length(seq)
         tensor = self.E(seq + 1)
-        tensor = tf.nn.dropout(tensor, 1. - self.dropout)
+        tensor = [tf.nn.dropout(t, 1. - self.dropout) for t in tensor]
         for i in range(self.layer):
             skip = tensor
             tensor, h1, c1, h2, c2 = getattr(self, "layer{}".format(i))(tensor)
@@ -239,7 +239,7 @@ class ChildsumModel(BaseModel):
     def encode(self, x):
         tensor, indice, tree_num = x
         tensor = self.E(tensor)
-        tensor = tf.nn.dropout(tensor, 1. - self.dropout)
+        tensor = [tf.nn.dropout(t, 1. - self.dropout) for t in tensor]
         for i in range(self.layer):
             skip = tensorr
             tensor, c = getattr(self, "layer{}".format(i))(tensor, indice)
@@ -269,7 +269,7 @@ class NaryModel(BaseModel):
     def encode(self, x):
         tensor, indice, tree_num = x
         tensor = self.E(tensor)
-        tensor = tf.nn.dropout(tensor, 1. - self.dropout)
+        tensor = [tf.nn.dropout(t, 1. - self.dropout) for t in tensor]
         for i in range(self.layer):
             skip = tensor
             tensor, c = getattr(self, "layer{}".format(i))(tensor, indice)
@@ -299,7 +299,7 @@ class MultiwayModel(BaseModel):
     def encode(self, x):
         tensor, indice, tree_num = x
         tensor = self.E(tensor)
-        tensor = tf.nn.dropout(tensor, 1. - self.dropout)
+        tensor = [tf.nn.dropout(t, 1. - self.dropout) for t in tensor]
         for i in range(self.layer):
             skip = tensor
             tensor, c = getattr(self, "layer{}".format(i))(tensor, indice)
