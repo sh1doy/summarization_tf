@@ -215,11 +215,11 @@ class Seq2seqModel(BaseModel):
         tensor = tf.nn.dropout(tensor, 1. - self.dropout)
         for i in range(self.layer):
             skip = tensor
-            tensor, h1, c1, h2, c2 = getattr(self, "layer{}".format(i))(tensor)
+            tensor, h, c = getattr(self, "layer{}".format(i))(tensor)
             tensor += skip
 
-        cx = c1 + c2
-        hx = h1 + h2
+        cx = c
+        hx = h
         ys = [y[:i] for y, i in zip(tf.unstack(tensor, axis=0), length.numpy())]
 
         return ys, [hx, cx]
