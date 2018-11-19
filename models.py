@@ -213,11 +213,11 @@ class Seq2seqModel(BaseModel):
     def encode(self, seq):
         length = get_length(seq)
         tensor = self.E(seq + 1)
-        tensor = [tf.nn.dropout(t, 1. - self.dropout) for t in tensor]
+        tensor = tf.nn.dropout(tensor)
         for i in range(self.layer):
             skip = tensor
             tensor, h1, c1, h2, c2 = getattr(self, "layer{}".format(i))(tensor)
-            tensor += [t + s for t, s in zip(tensor, skip)]
+            tensor += skip
 
         cx = c1 + c2
         hx = h1 + h2
@@ -243,7 +243,7 @@ class ChildsumModel(BaseModel):
         for i in range(self.layer):
             skip = tensor
             tensor, c = getattr(self, "layer{}".format(i))(tensor, indice)
-            tensor += [t + s for t, s in zip(tensor, skip)]
+            tensor = [t + s for t, s in zip(tensor, skip)]
 
         hx = tensor[-1]
         cx = c[-1]
@@ -273,7 +273,7 @@ class NaryModel(BaseModel):
         for i in range(self.layer):
             skip = tensor
             tensor, c = getattr(self, "layer{}".format(i))(tensor, indice)
-            tensor += [t + s for t, s in zip(tensor, skip)]
+            tensor = [t + s for t, s in zip(tensor, skip)]
 
         hx = tensor[-1]
         cx = c[-1]
@@ -303,7 +303,7 @@ class MultiwayModel(BaseModel):
         for i in range(self.layer):
             skip = tensor
             tensor, c = getattr(self, "layer{}".format(i))(tensor, indice)
-            tensor += [t + s for t, s in zip(tensor, skip)]
+            tensor = [t + s for t, s in zip(tensor, skip)]
 
         hx = tensor[-1]
         cx = c[-1]
