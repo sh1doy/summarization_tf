@@ -1,6 +1,6 @@
 import argparse
-from utils import read_pickle, Datagen_set, Datagen_deepcom, Datagen_tree, bleu4
-from models import Seq2seqModel, CodennModel, ChildsumModel, MultiwayModel
+from utils import read_pickle, Datagen_set, Datagen_deepcom, Datagen_tree, Datagen_binary, bleu4
+from models import Seq2seqModel, CodennModel, ChildsumModel, MultiwayModel, NaryModel
 import numpy as np
 import os
 import tensorflow as tf
@@ -14,7 +14,7 @@ import json
 parser = argparse.ArgumentParser(description='Source Code Generation')
 
 parser.add_argument('-m', "--method", type=str, nargs="?", required=True,
-                    choices=['seq2seq', 'deepcom', 'codenn', 'childsum', 'multiway'],
+                    choices=['seq2seq', 'deepcom', 'codenn', 'childsum', 'multiway', "nary"],
                     help='Encoder method')
 parser.add_argument('-d', "--dim", type=int, nargs="?", required=False, default=512,
                     help='Representation dimension')
@@ -34,8 +34,6 @@ parser.add_argument('-l', "--layer", type=int, nargs="?", required=False, defaul
                     help='Number of layers')
 parser.add_argument("--val", type=str, nargs="?", required=False, default="BLEU",
                     help='Validation method')
-parser.add_argument("--newepoch", type=int, nargs="?", required=True,
-                    help='Epoch number')
 
 args = parser.parse_args()
 
@@ -53,6 +51,7 @@ tfe = tf.contrib.eager
 config = tf.ConfigProto(
     gpu_options=tf.GPUOptions(
         visible_device_list=args.gpu))
+# config.gpu_options.allow_growth = True
 session = tf.Session(config=config)
 tf.enable_eager_execution(config=config)
 os.makedirs("./logs/" + name, exist_ok=True)
@@ -88,9 +87,12 @@ elif args.method in ['childsum']:
     Model = ChildsumModel
 elif args.method in ['multiway']:
     Model = MultiwayModel
+elif args.method in ['nary']:
+    Model = NaryModel
+
 
 model = Model(args.dim, args.dim, args.dim, len(code_w2i), len(nl_w2i),
-              dropout=args.drop, lr=args.lr)
+              dropout=args.drop, lr=args.lr, layer=args.layer)
 epochs = args.epochs
 batch_size = args.batch
 os.makedirs(checkpoint_dir, exist_ok=True)
@@ -100,20 +102,17 @@ history = {"loss": [], "loss_val": [], "bleu_val": []}
 
 root.restore(tf.train.latest_checkpoint(checkpoint_dir))
 
-with open(os.path.join(checkpoint_dir, "history.json"), "r") as f:
-    history = json.load(f)
-
-
 # Setting Data Generator
 
 if args.method in ['deepcom']:
     Datagen = Datagen_deepcom
-# elif args.method in ['seq2seq']:
-#     Datagen = a
 elif args.method in ['codenn']:
     Datagen = Datagen_set
 elif args.method in ['childsum', 'multiway']:
     Datagen = Datagen_tree
+elif args.method in ['nary']:
+    Datagen = Datagen_binary
+
 
 trn_gen = Datagen(trn_x, trn_y, batch_size, code_w2i, nl_i2w, train=True)
 vld_gen = Datagen(vld_x, vld_y, batch_size, code_w2i, nl_i2w, train=False)
@@ -123,7 +122,7 @@ tst_gen = Datagen(tst_x, tst_y, batch_size, code_w2i, nl_i2w, train=False)
 # training
 with writer.as_default(), tf.contrib.summary.always_record_summaries():
 
-    for epoch in range(epochs + 1, args.newepoch + 1):
+    for epoch in range(1, epochs + 1):
 
         # train
         loss_tmp = []
@@ -158,15 +157,17 @@ with writer.as_default(), tf.contrib.summary.always_record_summaries():
         tf.contrib.summary.scalar("bleu_val", np.mean(bleus), step=epoch)
 
         # checkpoint
+        checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
+        hoge = root.save(file_prefix=checkpoint_prefix)
         if history["bleu_val"][-1] == max(history["bleu_val"]):
-            checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
-            root.save(file_prefix=checkpoint_prefix)
+            best_model = hoge
+            print("Now best model is {}".format(best_model))
 
 
 # load final weight
 
-root.restore(tf.train.latest_checkpoint(checkpoint_dir))
-
+print("Restore {}".format(best_model))
+root.restore(best_model)
 
 # evaluation
 

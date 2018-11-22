@@ -92,7 +92,7 @@ elif args.method in ['nary']:
 
 
 model = Model(args.dim, args.dim, args.dim, len(code_w2i), len(nl_w2i),
-              dropout=0.5, lr=args.lr, layer=args.layer)
+              dropout=args.drop, lr=args.lr, layer=args.layer)
 epochs = args.epochs
 batch_size = args.batch
 os.makedirs(checkpoint_dir, exist_ok=True)

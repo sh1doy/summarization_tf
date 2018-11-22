@@ -53,9 +53,9 @@ def tree2tensor(trees):
             n.num = e + 1
     depthes = [x[1] for x in sorted(res.items(), key=lambda x:-x[0])]
     indices = [get_nums(nodes) for nodes in depthes]
-    depthes = [tf.constant([n.label for n in nn], tf.int32) for nn in depthes]
+    depthes = [np.array([n.label for n in nn], np.int32) for nn in depthes]
     tree_num = [
-        tf.constant(x[1], tf.int32) for x in sorted(tree_num.items(), key=lambda x:-x[0])]
+        np.array(x[1], np.int32) for x in sorted(tree_num.items(), key=lambda x:-x[0])]
     return depthes, indices, tree_num
 
 
@@ -311,11 +311,10 @@ class Datagen_tree:
             y_raw = [[self.nl_dic[t] for t in s] for s in y]
             x = [consult_tree(n, self.code_dic) for n in x_raw]
             x_raw = [traverse_label(n) for n in x_raw]
-            y = tf.constant(
-                tf.keras.preprocessing.sequence.pad_sequences(
-                    y,
-                    min(max([len(s) for s in y]), 100),
-                    padding="post", truncating="post", value=-1.))
+            y = tf.keras.preprocessing.sequence.pad_sequences(
+                y,
+                min(max([len(s) for s in y]), 100),
+                padding="post", truncating="post", value=-1.)
             yield tree2tensor(x), y, x_raw, y_raw
 
 
