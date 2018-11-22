@@ -125,7 +125,7 @@ with writer.as_default(), tf.contrib.summary.always_record_summaries():
 
         # train
         loss_tmp = []
-        t = tqdm(trn_gen(epoch))
+        t = tqdm(trn_gen(0))
         for x, y, _, _ in t:
             loss_tmp.append(model.train_on_batch(x, y))
             t.set_description("epoch:{:03d}, loss = {}".format(epoch, np.mean(loss_tmp)))
@@ -134,7 +134,7 @@ with writer.as_default(), tf.contrib.summary.always_record_summaries():
 
         # validate loss
         loss_tmp = []
-        t = tqdm(vld_gen())
+        t = tqdm(vld_gen(0))
         for x, y, _, _ in t:
             loss_tmp.append(model.evaluate_on_batch(x, y))
             t.set_description("epoch:{:03d}, loss_val = {}".format(epoch, np.mean(loss_tmp)))
@@ -145,7 +145,7 @@ with writer.as_default(), tf.contrib.summary.always_record_summaries():
         preds = []
         trues = []
         bleus = []
-        t = tqdm(vld_gen())
+        t = tqdm(vld_gen(0))
         for x, y, _, y_raw in t:
             res = model.translate(x, nl_i2w, nl_w2i)
             preds += res
