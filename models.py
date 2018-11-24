@@ -38,8 +38,9 @@ class AttentionDecoder(tf.keras.Model):
         mask = tf.not_equal(target, -1.)
         h, c = states
         enc_y, _ = pad_tensor(enc_y)
-        dec_hidden = h
-        dec_cell = c
+        enc_y = tf.nn.dropout(enc_y, 1. - dropout)
+        dec_hidden = tf.nn.dropout(h, 1. - dropout)
+        dec_cell = tf.nn.dropout(c, 1. - dropout)
 
         l_states = [(dec_hidden, dec_cell) for _ in range(self.layer)]
         target = tf.nn.relu(target)
@@ -120,9 +121,9 @@ class AttentionDecoder(tf.keras.Model):
         # passing the concatenated vector to the GRU
         new_l_states = []
         for i, states in zip(range(self.layer), l_states):
-            skip = x[:, :, :self.dim_rep]
+            # skip = x[:, :, :self.dim_rep]
             x, h, c = getattr(self, "layer{}".format(i))(x, states)
-            x += skip
+            # x += skip
             n_states = (h, c)
             new_l_states.append(n_states)
 
@@ -190,7 +191,7 @@ class CodennModel(BaseModel):
 
     def encode(self, sets):
         sets = self.E(sets)
-        sets = [tf.nn.dropout(t, 1. - self.dropout) for t in sets]
+        # sets = [tf.nn.dropout(t, 1. - self.dropout) for t in sets]
 
         hx = tf.zeros([len(sets), self.dim_rep])
         cx = tf.zeros([len(sets), self.dim_rep])
@@ -217,11 +218,11 @@ class Seq2seqModel(BaseModel):
     def encode(self, seq):
         length = get_length(seq)
         tensor = self.E(seq + 1)
-        tensor = tf.nn.dropout(tensor, 1. - self.dropout)
+        # tensor = tf.nn.dropout(tensor, 1. - self.dropout)
         for i in range(self.layer):
             skip = tensor
             tensor, h, c = getattr(self, "layer{}".format(i))(tensor)
-            tensor += skip
+            # tensor += skip
 
         cx = c
         hx = h
@@ -245,11 +246,11 @@ class ChildsumModel(BaseModel):
     def encode(self, x):
         tensor, indice, tree_num = x
         tensor = self.E(tensor)
-        tensor = [tf.nn.dropout(t, 1. - self.dropout) for t in tensor]
+        # tensor = [tf.nn.dropout(t, 1. - self.dropout) for t in tensor]
         for i in range(self.layer):
             skip = tensor
             tensor, c = getattr(self, "layer{}".format(i))(tensor, indice)
-            tensor = [t + s for t, s in zip(tensor, skip)]
+            # tensor = [t + s for t, s in zip(tensor, skip)]
 
         hx = tensor[-1]
         cx = c[-1]
@@ -277,11 +278,11 @@ class NaryModel(BaseModel):
     def encode(self, x):
         tensor, indice, tree_num = x
         tensor = self.E(tensor)
-        tensor = [tf.nn.dropout(t, 1. - self.dropout) for t in tensor]
+        # tensor = [tf.nn.dropout(t, 1. - self.dropout) for t in tensor]
         for i in range(self.layer):
             skip = tensor
             tensor, c = getattr(self, "layer{}".format(i))(tensor, indice)
-            tensor = [t + s for t, s in zip(tensor, skip)]
+            # tensor = [t + s for t, s in zip(tensor, skip)]
 
         hx = tensor[-1]
         cx = c[-1]
@@ -309,11 +310,11 @@ class MultiwayModel(BaseModel):
     def encode(self, x):
         tensor, indice, tree_num = x
         tensor = self.E(tensor)
-        tensor = [tf.nn.dropout(t, 1. - self.dropout) for t in tensor]
+        # tensor = [tf.nn.dropout(t, 1. - self.dropout) for t in tensor]
         for i in range(self.layer):
             skip = tensor
             tensor, c = getattr(self, "layer{}".format(i))(tensor, indice)
-            tensor = [t + s for t, s in zip(tensor, skip)]
+            # tensor = [t + s for t, s in zip(tensor, skip)]
 
         hx = tensor[-1]
         cx = c[-1]
