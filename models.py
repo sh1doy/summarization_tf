@@ -122,7 +122,7 @@ class AttentionDecoder(tf.keras.Model):
         new_l_states = []
         for i, states in zip(range(self.layer), l_states):
             if i < self.layer - 1:
-                skip = x[:, :, :self.dim_rep]
+                skip = x
                 x, h, c = getattr(self, "layer{}".format(i))(x, states)
                 x += skip
             else:
