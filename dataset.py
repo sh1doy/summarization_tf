@@ -62,7 +62,7 @@ def clean_nl(s):
     s = s.split(". ")[0]
     s = re.sub("[<].+?[>]", "", s)
     s = re.sub("[\[\]\%]", "", s)
-    s = s[0:1].upper() + s[1:]
+    s = s[0:1].lower() + s[1:]
     return s
 
 

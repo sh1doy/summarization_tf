@@ -40,7 +40,7 @@ args = parser.parse_args()
 name = args.method + "_dim" + str(args.dim) + "_embed" + str(args.embed)
 name = name + "_drop" + str(args.drop)
 name = name + "_lr" + str(args.lr) + "_batch" + str(args.batch)
-name = name + "_epochs" + str(args.epochs) + "_layer" + str(args.layer) + "NEW_skip"
+name = name + "_epochs" + str(args.epochs) + "_layer" + str(args.layer) + "NEW_skip_size100"
 
 checkpoint_dir = "./models/" + name
 
