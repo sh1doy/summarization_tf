@@ -116,14 +116,18 @@ class AttentionDecoder(tf.keras.Model):
         x = self.F(x)
 
         # x shape after concatenation == (batch_size, 1, embedding_dim + hidden_size)
-        x = tf.concat([tf.expand_dims(context_vector, 1), x], axis=-1)
+        # x = tf.concat([tf.expand_dims(context_vector, 1), x], axis=-1)
 
         # passing the concatenated vector to the GRU
         new_l_states = []
         for i, states in zip(range(self.layer), l_states):
-            # skip = x[:, :, :self.dim_rep]
-            x, h, c = getattr(self, "layer{}".format(i))(x, states)
-            # x += skip
+            if i < self.layer - 1:
+                skip = x
+                x, h, c = getattr(self, "layer{}".format(i))(x, states)
+                x += skip
+            else:
+                x = tf.concat([tf.expand_dims(context_vector, 1), x], axis=-1)
+                x, h, c = getattr(self, "layer{}".format(i))(x, states)
             n_states = (h, c)
             new_l_states.append(n_states)
 
@@ -222,7 +226,7 @@ class Seq2seqModel(BaseModel):
         for i in range(self.layer):
             skip = tensor
             tensor, h, c = getattr(self, "layer{}".format(i))(tensor)
-            # tensor += skip
+            tensor += skip
 
         cx = c
         hx = h
@@ -250,7 +254,7 @@ class ChildsumModel(BaseModel):
         for i in range(self.layer):
             skip = tensor
             tensor, c = getattr(self, "layer{}".format(i))(tensor, indice)
-            # tensor = [t + s for t, s in zip(tensor, skip)]
+            tensor = [t + s for t, s in zip(tensor, skip)]
 
         hx = tensor[-1]
         cx = c[-1]
@@ -282,7 +286,7 @@ class NaryModel(BaseModel):
         for i in range(self.layer):
             skip = tensor
             tensor, c = getattr(self, "layer{}".format(i))(tensor, indice)
-            # tensor = [t + s for t, s in zip(tensor, skip)]
+            tensor = [t + s for t, s in zip(tensor, skip)]
 
         hx = tensor[-1]
         cx = c[-1]
@@ -314,7 +318,7 @@ class MultiwayModel(BaseModel):
         for i in range(self.layer):
             skip = tensor
             tensor, c = getattr(self, "layer{}".format(i))(tensor, indice)
-            # tensor = [t + s for t, s in zip(tensor, skip)]
+            tensor = [t + s for t, s in zip(tensor, skip)]
 
         hx = tensor[-1]
         cx = c[-1]
