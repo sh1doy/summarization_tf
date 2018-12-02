@@ -47,7 +47,7 @@ def is_invalid_tree(root):
     labels = traverse_label(root)
     if root.label == 'root (ConstructorDeclaration)':
         return True
-    if len(labels) > 50:
+    if len(labels) >= 100:
         return True
     method_name = get_method_name(root)
     for word in ["test", "Test", "set", "Set", "get", "Get"]:
