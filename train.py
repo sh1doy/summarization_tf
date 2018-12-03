@@ -68,9 +68,9 @@ code_w2i = read_pickle("dataset/code_w2i.pkl")
 nl_i2w = read_pickle("dataset/nl_i2w.pkl")
 nl_w2i = read_pickle("dataset/nl_w2i.pkl")
 
-trn_x, trn_y_raw = zip(*trn_data.items())
-vld_x, vld_y_raw = zip(*vld_data.items())
-tst_x, tst_y_raw = zip(*tst_data.items())
+trn_x, trn_y_raw = zip(*sorted(trn_data.items()))
+vld_x, vld_y_raw = zip(*sorted(vld_data.items()))
+tst_x, tst_y_raw = zip(*sorted(tst_data.items()))
 
 trn_y = [[nl_w2i[t] if t in nl_w2i.keys() else nl_w2i["<UNK>"] for t in l] for l in trn_y_raw]
 vld_y = [[nl_w2i[t] if t in nl_w2i.keys() else nl_w2i["<UNK>"] for t in l] for l in vld_y_raw]
