@@ -1,6 +1,6 @@
 # Attention-based Tree-to-Sequence Code Summarization Model
 
-The TensorFlow Eager Execution implementation of [Source Code Summarization with Extended Tree-LSTM]()
+The TensorFlow Eager Execution implementation of [Source Code Summarization with Extended Tree-LSTM]() (Shido+, 2019)
 
 including:
 
