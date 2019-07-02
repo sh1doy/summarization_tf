@@ -36,7 +36,7 @@ docutils==0.13.1
 entrypoints==0.2.2
 et-xmlfile==1.0.1
 fastcache==1.0.2
-Flask==0.12.2
+Flask==0.12.3
 Flask-Cors==3.0.2
 gast==0.2.0
 gevent==1.2.1
