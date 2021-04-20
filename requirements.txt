@@ -106,7 +106,7 @@ prompt-toolkit==1.0.14
 protobuf==3.6.1
 psutil==5.2.2
 ptyprocess==0.5.1
-py==1.4.33
+py==1.10.0
 pycosat==0.6.2
 pycparser==2.17
 pycrypto==2.6.1
