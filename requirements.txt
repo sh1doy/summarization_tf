@@ -44,7 +44,7 @@ greenlet==0.4.12
 grpcio==1.15.0
 h5py==2.8.0
 HeapDict==1.0.0
-html5lib==0.999
+html5lib==0.99999999
 idna==2.5
 imagesize==0.7.1
 ipykernel==4.6.1
